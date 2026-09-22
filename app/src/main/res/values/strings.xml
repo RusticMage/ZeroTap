@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">ZeroTap</string>
+    <string name="protection_on">Protection ON</string>
+    <string name="protection_off">Protection OFF</string>
+    <string name="risk_normal">Low</string>
+    <string name="risk_watch">Watch</string>
+    <string name="risk_suspicious">Suspicious</string>
+    <string name="risk_high">High Risk</string>
+    <string name="risk_incident">Incident</string>
+    <string name="risk_resolved">Resolved</string>
+
+    <!-- Permissions -->
+    <string name="permission_location_title">Location Access</string>
+    <string name="permission_location_rationale">ZeroTap uses your location to detect unexpected stops, route deviations, and to include location in incident reports sent to your trusted contacts.</string>
+    <string name="permission_microphone_title">Microphone Access</string>
+    <string name="permission_microphone_rationale">ZeroTap monitors ambient audio patterns (on-device only) to detect distress sounds. Audio is never uploaded or stored beyond a short encrypted buffer.</string>
+    <string name="permission_notification_title">Notifications</string>
+    <string name="permission_notification_rationale">ZeroTap needs notification permission to show protection status and alert you during incidents.</string>
+    <string name="permission_sms_title">SMS Access</string>
+    <string name="permission_sms_rationale">ZeroTap can send SMS alerts to your trusted contacts when an incident is detected and internet is unavailable.</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_protection">Protection Service</string>
+    <string name="notification_channel_incident">Incident Alerts</string>
+    <string name="notification_protection_title">ZeroTap Protection Active</string>
+    <string name="notification_protection_text">Monitoring your safety in the background</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_history">History</string>
+    <string name="nav_contacts">Contacts</string>
+    <string name="nav_settings">Settings</string>
+</resources>

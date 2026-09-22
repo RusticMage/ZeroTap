@@ -1,0 +1,124 @@
+{
+  "emergency_resources": [
+    {
+      "name": "Thousand Lights Police Station",
+      "type": "POLICE",
+      "latitude": 13.0601,
+      "longitude": 80.2520,
+      "phone": "044-28292121",
+      "address": "Anna Salai, Thousand Lights, Chennai"
+    },
+    {
+      "name": "Mylapore Police Station",
+      "type": "POLICE",
+      "latitude": 13.0336,
+      "longitude": 80.2675,
+      "phone": "044-24984242",
+      "address": "Kutchery Road, Mylapore, Chennai"
+    },
+    {
+      "name": "Anna Nagar Police Station (K-4)",
+      "type": "POLICE",
+      "latitude": 13.0850,
+      "longitude": 80.2100,
+      "phone": "044-26211111",
+      "address": "2nd Avenue, Anna Nagar, Chennai"
+    },
+    {
+      "name": "T. Nagar Police Station (R-1)",
+      "type": "POLICE",
+      "latitude": 13.0418,
+      "longitude": 80.2341,
+      "phone": "044-24340505",
+      "address": "Usman Road, T. Nagar, Chennai"
+    },
+    {
+      "name": "Adyar Police Station (J-2)",
+      "type": "POLICE",
+      "latitude": 13.0064,
+      "longitude": 80.2575,
+      "phone": "044-24911000",
+      "address": "L.B. Road, Adyar, Chennai"
+    },
+    {
+      "name": "Guindy Police Station (J-3)",
+      "type": "POLICE",
+      "latitude": 13.0067,
+      "longitude": 80.2025,
+      "phone": "044-22341010",
+      "address": "GST Road, Guindy, Chennai"
+    },
+    {
+      "name": "Rajiv Gandhi Govt General Hospital",
+      "type": "HOSPITAL",
+      "latitude": 13.0805,
+      "longitude": 80.2770,
+      "phone": "044-25305000",
+      "address": "EVR Periyar Salai, Park Town, Chennai"
+    },
+    {
+      "name": "Apollo Hospitals Main Greams Road",
+      "type": "HOSPITAL",
+      "latitude": 13.0577,
+      "longitude": 80.2508,
+      "phone": "044-28290200",
+      "address": "21 Greams Lane, Thousand Lights, Chennai"
+    },
+    {
+      "name": "Fortis Malar Hospital",
+      "type": "HOSPITAL",
+      "latitude": 13.0076,
+      "longitude": 80.2582,
+      "phone": "044-42892222",
+      "address": "1st Main Road, Gandhi Nagar, Adyar, Chennai"
+    },
+    {
+      "name": "MIOT International Hospital",
+      "type": "HOSPITAL",
+      "latitude": 13.0232,
+      "longitude": 80.1873,
+      "phone": "044-42002288",
+      "address": "4/112 Mount Poonamallee Rd, Manapakkam, Chennai"
+    },
+    {
+      "name": "Govt Multi Super Speciality Hospital",
+      "type": "HOSPITAL",
+      "latitude": 13.0694,
+      "longitude": 80.2731,
+      "phone": "044-25363000",
+      "address": "Omandurar Government Estate, Anna Salai, Chennai"
+    },
+    {
+      "name": "Puratchi Thalaivar Dr. MGR Central Metro",
+      "type": "METRO",
+      "latitude": 13.0818,
+      "longitude": 80.2741,
+      "phone": "1860-425-1515",
+      "address": "Poonamallee High Rd, Chennai Central"
+    },
+    {
+      "name": "Guindy Metro Station",
+      "type": "METRO",
+      "latitude": 13.0090,
+      "longitude": 80.2125,
+      "phone": "1860-425-1515",
+      "address": "GST Road, Guindy, Chennai"
+    },
+    {
+      "name": "Chennai International Airport Metro",
+      "type": "METRO",
+      "latitude": 12.9815,
+      "longitude": 80.1636,
+      "phone": "1860-425-1515",
+      "address": "GST Road, Meenambakkam, Chennai"
+    },
+    {
+      "name": "Koyambedu Metro Station",
+      "type": "METRO",
+      "latitude": 13.0732,
+      "longitude": 80.1945,
+      "phone": "1860-425-1515",
+      "address": "Jawaharlal Nehru Road, Koyambedu, Chennai"
+    }
+  ]
+}
