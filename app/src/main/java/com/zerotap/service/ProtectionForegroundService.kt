@@ -10,13 +10,18 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import com.zerotap.MainActivity
-import com.zerotap.sensor.audio.AudioInferenceEngine
 import com.zerotap.ai.audio.DevelopmentAudioInferenceEngine
+import com.zerotap.ai.hierarchical.HierarchicalInferenceCoordinator
+import com.zerotap.ai.hierarchical.InferenceTier
 import com.zerotap.ai.llm.DevelopmentIncidentSummarizer
 import com.zerotap.ai.llm.LocalIncidentSummarizer
 import com.zerotap.ai.motion.DevelopmentMotionInferenceEngine
+import com.zerotap.ai.speech.OnDeviceDeterrentSpeaker
 import com.zerotap.alert.AlertManager
 import com.zerotap.alert.InternetAlertTransport
 import com.zerotap.alert.SmsAlertTransport
@@ -26,6 +31,7 @@ import com.zerotap.data.datastore.UserPreferences
 import com.zerotap.data.db.ZeroTapDatabase
 import com.zerotap.data.repository.IncidentRepository
 import com.zerotap.data.safety.ChennaiSafetyDatabase
+import com.zerotap.domain.accident.*
 import com.zerotap.domain.incident.IncidentManager
 import com.zerotap.domain.model.*
 import com.zerotap.domain.response.ResponseManager
@@ -36,6 +42,7 @@ import com.zerotap.domain.risk.RiskPredictionEngine
 import com.zerotap.domain.risk.TemporalRiskTracker
 import com.zerotap.evidence.RollingEvidenceBuffer
 import com.zerotap.sensor.audio.AudioDataSource
+import com.zerotap.sensor.audio.AudioInferenceEngine
 import com.zerotap.sensor.feature.ExtractedMotionFeatures
 import com.zerotap.sensor.feature.StandardSensorFeatureExtractor
 import com.zerotap.sensor.location.LocationAnalysis
@@ -66,6 +73,12 @@ class ProtectionForegroundService : Service() {
     private val riskEngine: RiskEngine = DevelopmentRiskEngine()
     private val riskPredictionEngine: RiskPredictionEngine = DevelopmentRiskPredictionEngine()
     private val temporalTracker = TemporalRiskTracker()
+
+    // Hierarchical Edge AI and Vehicle Accident components
+    private val hierarchicalCoordinator = HierarchicalInferenceCoordinator(featureExtractor, motionEngine, audioEngine, riskPredictionEngine)
+    private lateinit var accidentDetector: VehicleAccidentDetector
+    private lateinit var accidentStateMachine: VehicleAccidentStateMachine
+    private lateinit var deterrentSpeaker: OnDeviceDeterrentSpeaker
 
     private lateinit var evidenceBuffer: RollingEvidenceBuffer
     private lateinit var summarizer: LocalIncidentSummarizer
@@ -116,6 +129,53 @@ class ProtectionForegroundService : Service() {
         activeTemporalTracker = temporalTracker
         activeResponseManager = responseManager
 
+        accidentDetector = VehicleAccidentDetector(AccidentDetectionConfig())
+        deterrentSpeaker = OnDeviceDeterrentSpeaker(this)
+        accidentStateMachine = VehicleAccidentStateMachine(
+            config = AccidentDetectionConfig(),
+            onEnterUserCheck = { evidence ->
+                triggerAccidentVibration()
+                deterrentSpeaker.speakPrompt("Possible vehicle accident detected. Are you okay?")
+                notifyUserCheckAccident(evidence)
+            },
+            onEscalationTimeout = { evidence, eventId ->
+                val loc = lastLocationSample?.let { l ->
+                    LocationContext(
+                        timestamp = System.currentTimeMillis(),
+                        latitude = l.latitude,
+                        longitude = l.longitude,
+                        accuracy = l.accuracy,
+                        speed = l.speed,
+                        bearing = l.bearing,
+                        isMoving = false,
+                        isUnexpectedStop = true,
+                        stopDurationMs = 0L,
+                        historicalSafetyContext = null
+                    )
+                }
+                responseManager.onAccidentEscalation(
+                    incidentId = eventId,
+                    confidence = evidence.confidence,
+                    locationContext = loc,
+                    evidenceTags = evidence.contributingFactors
+                )
+            },
+            onCancelCheck = {
+                deterrentSpeaker.stop()
+            }
+        )
+        activeAccidentStateMachine = accidentStateMachine
+
+        scope.launch {
+            accidentStateMachine.state.collect { _accidentState.value = it }
+        }
+        scope.launch {
+            accidentStateMachine.countdownSeconds.collect { _accidentCountdownSeconds.value = it }
+        }
+        scope.launch {
+            accidentStateMachine.currentEvidence.collect { _accidentEvidence.value = it }
+        }
+
         scope.launch {
             responseManager.smsDeliveryState.collect { _smsDeliveryState.value = it }
         }
@@ -146,7 +206,7 @@ class ProtectionForegroundService : Service() {
         startDiagnosticsBroadcaster()
 
         _isRunning.value = true
-        Logger.sensor("ProtectionService", "ProtectionForegroundService successfully started with 1000ms Risk Prediction Engine")
+        Logger.sensor("ProtectionService", "ProtectionForegroundService successfully started with 1000ms Risk Prediction Engine & Vehicle Accident Protection")
     }
 
     private fun startSensors() {
@@ -208,6 +268,14 @@ class ProtectionForegroundService : Service() {
             sampleRateCount = 0
             Logger.sensor("MotionData", "Sensor sampling rate: %.1f Hz, total samples: %d".format(estimatedRateHz, motionCount.get()))
         }
+
+        // Tier 0 Cheap Quiescence Filter (Preserves battery when completely at rest & quiet)
+        val isQuiescent = hierarchicalCoordinator.isDeviceQuiescent(lastMotionSample, lastAudioMetadata)
+        if (isQuiescent && temporalTracker.temporalState.value == TemporalRiskState.NORMAL && accidentStateMachine.state.value == AccidentState.NORMAL) {
+            _aiInferenceTier.value = InferenceTier.TIER_0_LOW_POWER_REST
+            return
+        }
+        _aiInferenceTier.value = InferenceTier.TIER_1_LIGHTWEIGHT_INFERENCE
 
         val signals = mutableListOf<RiskSignal>()
 
@@ -344,6 +412,11 @@ class ProtectionForegroundService : Service() {
             durationInCurrentStateSeconds = temporalTracker.durationInCurrentStateSeconds
         )
 
+        // Tier 2 Event-Triggered Incident Reasoning activation
+        if (prediction.scorePercent >= 60 || newTemporalState != TemporalRiskState.NORMAL) {
+            _aiInferenceTier.value = InferenceTier.TIER_2_INCIDENT_REASONING
+        }
+
         // Add to rolling history buffer (last 5 minutes)
         riskHistoryBuffer.add(Pair(now, finalPrediction.scorePercent))
 
@@ -380,11 +453,83 @@ class ProtectionForegroundService : Service() {
             engineLabel = prediction.engineLabel
         )
 
+        // E. VEHICLE ACCIDENT KINEMATICS EVALUATION (Shared physical sensor stream)
+        val accidentEvidence = accidentDetector.evaluate(
+            features = lastFeatures,
+            motionContext = motionContext,
+            recentLocations = locationHistoryBuffer.getSnapshot()
+        )
+        accidentStateMachine.processEvidence(accidentEvidence)
+        _accidentEvidence.value = accidentEvidence
+        _accidentState.value = accidentStateMachine.state.value
+        _accidentCountdownSeconds.value = accidentStateMachine.countdownSeconds.value
+
         // Periodic logging
         if (prediction.scorePercent > 20) {
             Logger.risk("RiskEngine", "Score: %d/100 | State: %s | Factors: %s".format(
                 prediction.scorePercent, newTemporalState.displayName, prediction.contributingFactors.joinToString(", ")
             ))
+        }
+    }
+
+    private fun triggerAccidentVibration() {
+        try {
+            val pattern = longArrayOf(0, 600, 300, 600, 300, 600)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                vibrator?.vibrate(pattern, -1)
+            }
+        } catch (e: Exception) {
+            Logger.alert("ProtectionService", "Failed to trigger vibration: ${e.message}")
+        }
+    }
+
+    private fun notifyUserCheckAccident(evidence: AccidentEvidence) {
+        try {
+            val launchIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("EXTRA_NAVIGATE_ACCIDENT", true)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, 1002, launchIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val channelId = "zerotap_emergency_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "ZeroTap Emergency Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "High-priority alerts for potential vehicle impacts or incidents"
+                    enableVibration(true)
+                }
+                val nm = getSystemService(NotificationManager::class.java)
+                nm.createNotificationChannel(channel)
+            }
+            val notification = NotificationCompat.Builder(this, channelId)
+                .setContentTitle("POSSIBLE VEHICLE ACCIDENT DETECTED")
+                .setContentText("15s grace period active. Tap to confirm you are fine.")
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setFullScreenIntent(pendingIntent, true)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build()
+
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(1003, notification)
+        } catch (e: Exception) {
+            Logger.alert("ProtectionService", "Failed to show accident notification: ${e.message}")
         }
     }
 
@@ -502,15 +647,23 @@ class ProtectionForegroundService : Service() {
         locationDataSource.stop()
         audioDataSource.stop()
 
+        accidentStateMachine.reset()
+        deterrentSpeaker.shutdown()
+
         serviceJob.cancel()
         _isRunning.value = false
         _currentRiskAssessment.value = null
         _predictionResult.value = null
         _temporalRiskState.value = TemporalRiskState.NORMAL
         _recentSignals.value = emptyList()
+        _accidentState.value = AccidentState.NORMAL
+        _accidentCountdownSeconds.value = 15
+        _accidentEvidence.value = null
+        _aiInferenceTier.value = InferenceTier.TIER_0_LOW_POWER_REST
         incidentManager = null
         activeTemporalTracker = null
         activeResponseManager = null
+        activeAccidentStateMachine = null
         Logger.sensor("ProtectionService", "ProtectionForegroundService destroyed and resources released")
     }
 
@@ -561,11 +714,24 @@ class ProtectionForegroundService : Service() {
         private val _emergencyCallStatus = MutableStateFlow<String?>(null)
         val emergencyCallStatus: StateFlow<String?> = _emergencyCallStatus.asStateFlow()
 
+        private val _accidentState = MutableStateFlow(AccidentState.NORMAL)
+        val accidentState: StateFlow<AccidentState> = _accidentState.asStateFlow()
+
+        private val _accidentCountdownSeconds = MutableStateFlow(15)
+        val accidentCountdownSeconds: StateFlow<Int> = _accidentCountdownSeconds.asStateFlow()
+
+        private val _accidentEvidence = MutableStateFlow<AccidentEvidence?>(null)
+        val accidentEvidence: StateFlow<AccidentEvidence?> = _accidentEvidence.asStateFlow()
+
+        private val _aiInferenceTier = MutableStateFlow(InferenceTier.TIER_0_LOW_POWER_REST)
+        val aiInferenceTier: StateFlow<InferenceTier> = _aiInferenceTier.asStateFlow()
+
         var incidentManager: IncidentManager? = null
             private set
 
         private var activeTemporalTracker: TemporalRiskTracker? = null
         private var activeResponseManager: ResponseManager? = null
+        private var activeAccidentStateMachine: VehicleAccidentStateMachine? = null
 
         fun cancelEmergency() {
             activeTemporalTracker?.cancelEmergency()
@@ -577,6 +743,26 @@ class ProtectionForegroundService : Service() {
             activeTemporalTracker?.triggerImmediately()
             _temporalRiskState.value = TemporalRiskState.EMERGENCY_TRIGGERED
             _countdownSeconds.value = 0
+        }
+
+        fun userAffirmsFine() {
+            activeAccidentStateMachine?.userAffirmsFine()
+            _accidentState.value = AccidentState.NORMAL
+            _accidentCountdownSeconds.value = 15
+        }
+
+        fun triggerAccidentForTesting(simulatedEvidence: AccidentEvidence) {
+            activeAccidentStateMachine?.triggerAccidentForTesting(simulatedEvidence)
+            _accidentState.value = AccidentState.USER_CHECK
+            _accidentCountdownSeconds.value = 15
+            _accidentEvidence.value = simulatedEvidence
+        }
+
+        fun resetAccident() {
+            activeAccidentStateMachine?.reset()
+            _accidentState.value = AccidentState.NORMAL
+            _accidentCountdownSeconds.value = 15
+            _accidentEvidence.value = null
         }
 
         suspend fun sendTestSms(): DeliveryResult {

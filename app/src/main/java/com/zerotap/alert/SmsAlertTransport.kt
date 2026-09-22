@@ -22,8 +22,96 @@ sealed class SmsDeliveryResult {
     data class PermissionRequired(val missingPermission: String) : SmsDeliveryResult()
 }
 
-class SmsAlertTransport(private val context: Context? = null) : AlertTransport {
+class SmsAlertTransport(private val context: Context? = null) : AlertTransport, EmergencyTransport {
     override val transportName: String = "SMS"
+
+    override suspend fun execute(payload: StructuredEmergencyPayload): EmergencyTransportResult {
+        val phone = payload.contactPhone?.trim()
+        if (phone.isNullOrBlank()) {
+            return EmergencyTransportResult.InvalidNumber(transportName, "")
+        }
+
+        // 1. Verify runtime SEND_SMS permission
+        if (context != null) {
+            val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS)
+            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                Logger.alert("SmsTransport", "[ZeroTap][Emergency] SEND_SMS permission missing")
+                return EmergencyTransportResult.PermissionDenied(transportName, Manifest.permission.SEND_SMS)
+            }
+        }
+
+        return try {
+            val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && context != null) {
+                context.getSystemService(SmsManager::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                SmsManager.getDefault()
+            }
+
+            val timeStr = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(payload.timestamp))
+
+            val messageText = if (payload.isTest) {
+                "ZeroTap DEMO TEST — no emergency has been detected. Contact verification successful."
+            } else {
+                val locText = if (payload.latitude != null && payload.longitude != null) {
+                    "Last known location:\nhttps://maps.google.com/?q=%.6f,%.6f".format(
+                        payload.latitude, payload.longitude
+                    )
+                } else {
+                    "Last known location:\nLocation unavailable"
+                }
+
+                when (payload.eventType) {
+                    EmergencyEventType.VEHICLE_ACCIDENT_SUSPECTED -> {
+                        """
+ZeroTap Safety Alert:
+
+A possible vehicle accident was detected.
+I did not receive a response from the user.
+
+$locText
+Time: $timeStr
+
+Please check on the user immediately.
+                        """.trimIndent()
+                    }
+                    EmergencyEventType.PERSONAL_SAFETY -> {
+                        val tagsText = if (payload.sensorTags.isNotEmpty()) {
+                            "Detected signals:\n" + payload.sensorTags.take(3).joinToString(", ") + "\n"
+                        } else ""
+
+                        """
+ZeroTap Safety Alert:
+
+Possible safety incident detected.
+I did not receive a response from the user.
+
+$locText
+Time: $timeStr
+$tagsText
+Please check on the user immediately.
+                        """.trimIndent()
+                    }
+                }
+            }
+
+            val parts = smsManager.divideMessage(messageText)
+            if (parts.size > 1) {
+                smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
+            } else {
+                smsManager.sendTextMessage(phone, null, messageText, null, null)
+            }
+
+            Logger.alert("SmsTransport", "[ZeroTap][Emergency] SMS dispatched to $phone (${parts.size} parts)")
+            EmergencyTransportResult.Success(transportName, System.currentTimeMillis(), "SMS sent to $phone")
+        } catch (e: SecurityException) {
+            Logger.alert("SmsTransport", "[ZeroTap][Emergency] SecurityException sending SMS: ${e.message}")
+            EmergencyTransportResult.PermissionDenied(transportName, Manifest.permission.SEND_SMS)
+        } catch (e: Exception) {
+            Logger.alert("SmsTransport", "[ZeroTap][Emergency] Exception sending SMS: ${e.message}")
+            EmergencyTransportResult.Failed(transportName, e.message ?: "Failed to dispatch SMS")
+        }
+    }
 
     suspend fun sendSms(alert: AlertPayload): SmsDeliveryResult {
         val phone = alert.contactPhone

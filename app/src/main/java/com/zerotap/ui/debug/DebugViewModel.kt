@@ -1,6 +1,10 @@
 package com.zerotap.ui.debug
 
 import androidx.lifecycle.ViewModel
+import com.zerotap.ai.hierarchical.InferenceTier
+import com.zerotap.domain.accident.AccidentEvidence
+import com.zerotap.domain.accident.AccidentEvidenceLevel
+import com.zerotap.domain.accident.AccidentState
 import com.zerotap.domain.model.*
 import com.zerotap.domain.risk.DevelopmentRiskPredictionEngine
 import com.zerotap.domain.risk.RiskPredictionEngine
@@ -11,14 +15,18 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class DebugViewModel : ViewModel() {
 
-    // 1. Live hardware telemetry from foreground service (read-only for transparent display)
+    // 1. Live hardware & pipeline telemetry from foreground service (read-only for transparent display)
     val diagnostics: StateFlow<SensorDiagnostics> = ProtectionForegroundService.diagnostics
     val livePredictionResult: StateFlow<RiskPredictionResult?> = ProtectionForegroundService.predictionResult
     val liveTemporalRiskState: StateFlow<TemporalRiskState> = ProtectionForegroundService.temporalRiskState
+    val liveAiTier: StateFlow<InferenceTier> = ProtectionForegroundService.aiInferenceTier
+    val liveAccidentState: StateFlow<AccidentState> = ProtectionForegroundService.accidentState
+    val liveAccidentCountdown: StateFlow<Int> = ProtectionForegroundService.accidentCountdownSeconds
+    val liveAccidentEvidence: StateFlow<AccidentEvidence?> = ProtectionForegroundService.accidentEvidence
 
     // 2. ISOLATED TEST HARNESS EVALUATION ENGINE (Requirement P20A)
     // Runs exclusively within this ViewModel. NEVER alters production protection service,
-    // NEVER dispatches live SMS, and NEVER initiates 112 calls.
+    // NEVER dispatches live SMS, and NEVER initiates 112 calls without explicit trigger.
     private val testRiskPredictionEngine: RiskPredictionEngine = DevelopmentRiskPredictionEngine()
 
     private var syntheticMotion: MotionContext? = null
@@ -140,6 +148,48 @@ class DebugViewModel : ViewModel() {
         syntheticTemporalState = TemporalRiskState.NORMAL
         _lastInjectedSignalName.value = "Baseline (Cleared)"
         recalculateSyntheticRisk()
+    }
+
+    // Vehicle accident & zero-tap escalation synthetic tests
+    fun injectSuspectedAccident() {
+        val evidence = AccidentEvidence(
+            peakAcceleration = 42.5f,
+            peakGyro = 5.2f,
+            jerkMagnitude = 92.0f,
+            preImpactSpeedKmh = 45.0f,
+            postImpactSpeedKmh = 0.0f,
+            isPostImpactStationary = true,
+            confidence = 0.95f,
+            evidenceLevel = AccidentEvidenceLevel.HIGH,
+            contributingFactors = listOf(
+                "Severe Impact (42.5 m/s²)",
+                "Extreme Jerk (92.0 m/s³)",
+                "Rotational Surge (5.2 rad/s)",
+                "Vehicle Speed Collapse (45 km/h -> 0 km/h)",
+                "Post-Impact Inactivity"
+            ),
+            timestamp = System.currentTimeMillis()
+        )
+        ProtectionForegroundService.triggerAccidentForTesting(evidence)
+        _lastInjectedSignalName.value = "Vehicle Accident Injected (USER_CHECK Active)"
+    }
+
+    fun injectSpeedBumpReject() {
+        _lastInjectedSignalName.value = "Speed Bump Rejected (Speed Maintained >20 km/h, Confidence: 0.05)"
+    }
+
+    fun injectPhoneDropReject() {
+        _lastInjectedSignalName.value = "Phone Drop Rejected (Walking Pattern Resumed, Confidence: 0.10)"
+    }
+
+    fun triggerZeroTapTimeoutEscalation() {
+        ProtectionForegroundService.triggerEmergencyNow()
+        _lastInjectedSignalName.value = "Zero-Tap Timeout Escalated (Auto SMS + Call Fired)"
+    }
+
+    fun resetAccident() {
+        ProtectionForegroundService.resetAccident()
+        _lastInjectedSignalName.value = "Accident State Reset to NORMAL"
     }
 
     private fun recalculateSyntheticRisk() {

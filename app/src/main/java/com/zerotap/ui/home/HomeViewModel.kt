@@ -1,18 +1,18 @@
 package com.zerotap.ui.home
 
+import android.app.Application
 import android.content.Context
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.zerotap.domain.model.RiskAssessment
-import com.zerotap.domain.model.RiskPredictionResult
-import com.zerotap.domain.model.RiskSignal
-import com.zerotap.domain.model.RiskState
-import com.zerotap.domain.model.SensorDiagnostics
-import com.zerotap.domain.model.TemporalRiskState
+import com.zerotap.data.db.ZeroTapDatabase
+import com.zerotap.data.db.entity.toDomain
+import com.zerotap.domain.accident.AccidentEvidence
+import com.zerotap.domain.accident.AccidentState
+import com.zerotap.domain.model.*
 import com.zerotap.service.ProtectionForegroundService
 import kotlinx.coroutines.flow.*
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     val protectionEnabled: StateFlow<Boolean> = ProtectionForegroundService.isRunning
 
@@ -27,6 +27,21 @@ class HomeViewModel : ViewModel() {
     val recentSignals: StateFlow<List<RiskSignal>> = ProtectionForegroundService.recentSignals
 
     val diagnostics: StateFlow<SensorDiagnostics> = ProtectionForegroundService.diagnostics
+
+    // Vehicle accident state
+    val accidentState: StateFlow<AccidentState> = ProtectionForegroundService.accidentState
+    val accidentCountdownSeconds: StateFlow<Int> = ProtectionForegroundService.accidentCountdownSeconds
+    val accidentEvidence: StateFlow<AccidentEvidence?> = ProtectionForegroundService.accidentEvidence
+
+    val isAccidentUserCheckActive: StateFlow<Boolean> = accidentState.map {
+        it == AccidentState.USER_CHECK
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // Primary trusted contact
+    private val contactDao = ZeroTapDatabase.getInstance(application).trustedContactDao()
+    val primaryContact: StateFlow<TrustedContact?> = contactDao.getAllContacts().map { entities ->
+        entities.firstOrNull { it.isPrimary }?.toDomain() ?: entities.firstOrNull()?.toDomain()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val currentRiskState: StateFlow<RiskState> = currentAssessment.map { assessment ->
         if (protectionEnabled.value) {

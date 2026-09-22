@@ -6,8 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.ContextCompat
-import com.zerotap.alert.SmsAlertTransport
-import com.zerotap.alert.SmsDeliveryResult
+import com.zerotap.alert.*
 import com.zerotap.data.datastore.UserPreferences
 import com.zerotap.data.db.dao.TrustedContactDao
 import com.zerotap.domain.model.*
@@ -39,6 +38,7 @@ class ResponseManager(
     private val contactDao: TrustedContactDao,
     private val userPreferences: UserPreferences,
     private val smsTransport: SmsAlertTransport = SmsAlertTransport(context),
+    private val callTransport: CallAlertTransport = CallAlertTransport(context),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
     @Volatile
@@ -49,6 +49,12 @@ class ResponseManager(
 
     private val _emergencyCallStatus = MutableStateFlow<String?>(null)
     val emergencyCallStatus: StateFlow<String?> = _emergencyCallStatus.asStateFlow()
+
+    fun resetState() {
+        notificationDispatchedForEventId = null
+        _smsDeliveryState.value = SmsDeliveryState.Idle
+        _emergencyCallStatus.value = null
+    }
 
     fun onEngineTick(
         temporalState: TemporalRiskState,
@@ -70,72 +76,131 @@ class ResponseManager(
             }
 
             notificationDispatchedForEventId = eventId
-            Logger.alert("ResponseManager", "Emergency triggered (Event ID: $eventId). Initiating single dispatch.")
+            Logger.alert("ResponseManager", "[ZeroTap][Emergency] Personal safety incident escalated (Event: $eventId). Zero-tap response executing.")
 
             scope.launch {
-                dispatchEmergencyResponse(prediction, locationContext, eventId)
+                val contacts = contactDao.getAllContacts().first()
+                val primaryContact = contacts.firstOrNull { it.isPrimary } ?: contacts.firstOrNull()
+
+                val payload = StructuredEmergencyPayload(
+                    incidentId = eventId,
+                    eventType = EmergencyEventType.PERSONAL_SAFETY,
+                    confidence = prediction.scorePercent / 100f,
+                    timestamp = prediction.timestamp,
+                    latitude = locationContext?.latitude,
+                    longitude = locationContext?.longitude,
+                    locationAccuracy = locationContext?.accuracy,
+                    contactName = primaryContact?.name,
+                    contactPhone = primaryContact?.phone,
+                    sensorTags = prediction.contributingFactors,
+                    durationSeconds = prediction.durationInCurrentStateSeconds,
+                    isTest = false
+                )
+
+                dispatchAutomatedEmergencyResponse(payload)
             }
         }
     }
 
-    private suspend fun dispatchEmergencyResponse(
-        prediction: RiskPredictionResult,
+    /**
+     * Dispatches zero-tap emergency alerts for vehicle accident timeout.
+     */
+    fun onAccidentEscalation(
+        incidentId: String,
+        confidence: Float,
         locationContext: LocationContext?,
-        eventId: String
+        evidenceTags: List<String>
     ) {
-        // 1. Fetch primary trusted contact
-        val contacts = contactDao.getAllContacts().first()
-        val primaryContact = contacts.firstOrNull { it.isPrimary } ?: contacts.firstOrNull()
+        if (notificationDispatchedForEventId == incidentId) return
+        notificationDispatchedForEventId = incidentId
 
-        if (primaryContact == null) {
-            Logger.alert("ResponseManager", "No trusted contact configured.")
-            _smsDeliveryState.value = SmsDeliveryState.NoPrimaryContact
-        } else {
-            _smsDeliveryState.value = SmsDeliveryState.Sending
-            val payload = AlertPayload(
-                incidentId = eventId,
-                message = "ZeroTap Emergency Triggered",
+        Logger.alert("ResponseManager", "[ZeroTap][Emergency] Suspected vehicle accident escalated (Event: $incidentId). Zero-tap response executing.")
+
+        scope.launch {
+            val contacts = contactDao.getAllContacts().first()
+            val primaryContact = contacts.firstOrNull { it.isPrimary } ?: contacts.firstOrNull()
+
+            val payload = StructuredEmergencyPayload(
+                incidentId = incidentId,
+                eventType = EmergencyEventType.VEHICLE_ACCIDENT_SUSPECTED,
+                confidence = confidence,
+                timestamp = System.currentTimeMillis(),
                 latitude = locationContext?.latitude,
                 longitude = locationContext?.longitude,
-                riskScore = prediction.scorePercent / 100f,
-                riskState = RiskState.INCIDENT,
-                timestamp = prediction.timestamp,
-                contactPhone = primaryContact.phone,
-                contactName = primaryContact.name,
                 locationAccuracy = locationContext?.accuracy,
-                riskDurationSeconds = prediction.durationInCurrentStateSeconds,
-                contributingFactors = prediction.contributingFactors,
+                contactName = primaryContact?.name,
+                contactPhone = primaryContact?.phone,
+                sensorTags = evidenceTags,
                 isTest = false
             )
 
-            when (val result = smsTransport.sendSms(payload)) {
-                is SmsDeliveryResult.Success -> {
-                    _smsDeliveryState.value = SmsDeliveryState.Sent(result.timestamp, primaryContact.name, primaryContact.phone)
-                }
-                is SmsDeliveryResult.Failed -> {
-                    _smsDeliveryState.value = SmsDeliveryState.Failed(result.reason)
-                }
-                is SmsDeliveryResult.PermissionRequired -> {
-                    _smsDeliveryState.value = SmsDeliveryState.PermissionRequired(result.missingPermission)
-                }
+            dispatchAutomatedEmergencyResponse(payload)
+        }
+    }
+
+    private suspend fun dispatchAutomatedEmergencyResponse(payload: StructuredEmergencyPayload) {
+        val phone = payload.contactPhone
+        if (phone.isNullOrBlank()) {
+            Logger.alert("ResponseManager", "[ZeroTap][Emergency] No trusted contact configured for automated response.")
+            _smsDeliveryState.value = SmsDeliveryState.NoPrimaryContact
+            _emergencyCallStatus.value = "No primary trusted contact phone number configured"
+            return
+        }
+
+        // STEP 1: AUTOMATIC SMS DISPATCH
+        _smsDeliveryState.value = SmsDeliveryState.Sending
+        Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: Automated SMS dispatch started for ${payload.contactName ?: phone}")
+        val smsResult = smsTransport.execute(payload)
+        when (smsResult) {
+            is EmergencyTransportResult.Success -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: SMS dispatch successful to $phone")
+                _smsDeliveryState.value = SmsDeliveryState.Sent(smsResult.timestamp, payload.contactName ?: "Primary Contact", phone)
+            }
+            is EmergencyTransportResult.PermissionDenied -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: SMS failed — Permission denied")
+                _smsDeliveryState.value = SmsDeliveryState.PermissionRequired(smsResult.missingPermission)
+            }
+            is EmergencyTransportResult.Failed -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: SMS failed — ${smsResult.reason}")
+                _smsDeliveryState.value = SmsDeliveryState.Failed(smsResult.reason)
+            }
+            is EmergencyTransportResult.InvalidNumber -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: SMS failed — Invalid number")
+                _smsDeliveryState.value = SmsDeliveryState.Failed("Invalid phone number")
+            }
+            is EmergencyTransportResult.NetworkUnavailable -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 1: SMS failed — Network unavailable")
+                _smsDeliveryState.value = SmsDeliveryState.Failed("Network unavailable")
             }
         }
 
-        // 2. 112 Emergency Call flow (Controlled strictly by Demo Emergency Call toggle)
+        // STEP 2: AUTOMATIC PHONE CALL INITIATION (Even if SMS failed)
+        Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Automated phone call initiation started")
         val isDemoCallEnabled = userPreferences.demoEmergencyCallEnabled.first()
-        if (isDemoCallEnabled) {
-            val callPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE)
-            if (callPermission == PackageManager.PERMISSION_GRANTED) {
-                _emergencyCallStatus.value = "DEMO CALL ENABLED: Calling emergency 112..."
-                Logger.alert("ResponseManager", "Demo Emergency Call = ON with permission. Placing call to 112.")
-                executeEmergencyCall("112")
-            } else {
-                _emergencyCallStatus.value = "CALL_PHONE permission missing — cannot place 112 call"
-                Logger.alert("ResponseManager", "Demo Emergency Call = ON but CALL_PHONE permission not granted.")
+        callTransport.isSimulationMode = !isDemoCallEnabled
+
+        val callResult = callTransport.execute(payload)
+        when (callResult) {
+            is EmergencyTransportResult.Success -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Phone call initiated (${callResult.details})")
+                _emergencyCallStatus.value = callResult.details ?: "Call initiated"
             }
-        } else {
-            _emergencyCallStatus.value = "Emergency call simulation: 112 call would be placed now (Demo Emergency Call is OFF)"
-            Logger.alert("ResponseManager", "Demo Emergency Call = OFF. Simulated 112 call only.")
+            is EmergencyTransportResult.PermissionDenied -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Call failed — CALL_PHONE permission missing")
+                _emergencyCallStatus.value = "CALL_PHONE permission required"
+            }
+            is EmergencyTransportResult.Failed -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Call failed — ${callResult.reason}")
+                _emergencyCallStatus.value = "Call failed: ${callResult.reason}"
+            }
+            is EmergencyTransportResult.InvalidNumber -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Call failed — Invalid number")
+                _emergencyCallStatus.value = "Invalid phone number"
+            }
+            is EmergencyTransportResult.NetworkUnavailable -> {
+                Logger.alert("ResponseManager", "[ZeroTap][Emergency] Step 2: Call failed — Cellular network unavailable")
+                _emergencyCallStatus.value = "Cellular network unavailable"
+            }
         }
     }
 

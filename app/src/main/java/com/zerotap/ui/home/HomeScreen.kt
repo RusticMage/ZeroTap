@@ -41,6 +41,18 @@ fun HomeScreen(
     val countdownSeconds by viewModel.countdownSeconds.collectAsStateWithLifecycle()
     val prediction by viewModel.predictionResult.collectAsStateWithLifecycle()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+    val isAccidentActive by viewModel.isAccidentUserCheckActive.collectAsStateWithLifecycle()
+    val accidentCountdown by viewModel.accidentCountdownSeconds.collectAsStateWithLifecycle()
+    val primaryContact by viewModel.primaryContact.collectAsStateWithLifecycle()
+
+    // Auto navigate to accident confirmation when vehicle impact is detected
+    LaunchedEffect(isAccidentActive) {
+        if (isAccidentActive) {
+            navController.navigate(Screen.AccidentConfirmation.route) {
+                launchSingleTop = true
+            }
+        }
+    }
 
     // Required runtime permissions handling
     val requiredPermissions = remember {
@@ -151,6 +163,46 @@ fun HomeScreen(
             }
         }
 
+        // Active Vehicle Accident Check Banner
+        if (isAccidentActive) {
+            item {
+                Surface(
+                    onClick = { navController.navigate(Screen.AccidentConfirmation.route) },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    tonalElevation = 6.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = "Accident Alert",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "POSSIBLE VEHICLE ACCIDENT ($accidentCountdown s)",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Grace period active. Tap now to confirm you are fine.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // 1. Central Live Risk Visualization Card with Explainability
         item {
             LiveRiskMeterCard(
@@ -181,6 +233,56 @@ fun HomeScreen(
                     }
                 }
             )
+        }
+
+        // Unified Safety Status Card (Active, Sensors, Modes, Contact, Auto Escalation)
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                tonalElevation = 2.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Unified Safety Status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    UnifiedStatusRow(
+                        label = "ZeroTap Protection",
+                        value = if (isProtectionActive) "Active" else "Standby",
+                        isHighlight = isProtectionActive
+                    )
+                    UnifiedStatusRow(
+                        label = "Sensors",
+                        value = "✓ Motion  ✓ Audio  ✓ Location",
+                        isHighlight = isProtectionActive
+                    )
+                    UnifiedStatusRow(
+                        label = "Protection Modes",
+                        value = "✓ Personal Safety  ✓ Vehicle Accident",
+                        isHighlight = isProtectionActive
+                    )
+                    UnifiedStatusRow(
+                        label = "Emergency Contact",
+                        value = primaryContact?.let { "${it.name} (${it.phone})" } ?: "None configured",
+                        isHighlight = primaryContact != null
+                    )
+                    UnifiedStatusRow(
+                        label = "Automatic Escalation",
+                        value = "ENABLED (Zero-Tap)",
+                        isHighlight = true
+                    )
+                }
+            }
         }
 
         // 3. Sensor Pipeline Status Section
@@ -270,3 +372,25 @@ fun HomeScreen(
         }
     }
 }
+
+@Composable
+private fun UnifiedStatusRow(label: String, value: String, isHighlight: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            color = if (isHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+

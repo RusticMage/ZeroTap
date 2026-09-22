@@ -10,4 +10,5 @@ sealed class Screen(val route: String) {
     object DebugDashboard : Screen("debug_dashboard")
     object ActiveIncident : Screen("active_incident")
     object EmergencyCountdown : Screen("emergency_countdown")
+    object AccidentConfirmation : Screen("accident_confirmation")
 }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.zerotap.ai.hierarchical.InferenceTier
 import com.zerotap.domain.model.ContributionLevel
 import com.zerotap.ui.components.HospitableSectionHeader
 
@@ -31,6 +32,10 @@ fun DebugDashboardScreen(
     val diag by viewModel.diagnostics.collectAsStateWithLifecycle()
     val syntheticResult by viewModel.syntheticRiskResult.collectAsStateWithLifecycle()
     val lastSignal by viewModel.lastInjectedSignalName.collectAsStateWithLifecycle()
+    val aiTier by viewModel.liveAiTier.collectAsStateWithLifecycle()
+    val accidentState by viewModel.liveAccidentState.collectAsStateWithLifecycle()
+    val accidentCountdown by viewModel.liveAccidentCountdown.collectAsStateWithLifecycle()
+    val accidentEvidence by viewModel.liveAccidentEvidence.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier
@@ -224,19 +229,101 @@ fun DebugDashboardScreen(
         }
 
         item {
+            Button(
+                onClick = { viewModel.injectSuspectedAccident() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Inject Suspected Vehicle Accident (High Impact)")
+            }
+        }
+
+        item {
+            Button(
+                onClick = { viewModel.injectSpeedBumpReject() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text("Inject Speed Bump (Verify Kinematic Rejection)", color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+
+        item {
+            Button(
+                onClick = { viewModel.injectPhoneDropReject() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Text("Inject Phone Drop (Verify Walking Rejection)", color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+
+        item {
+            Button(
+                onClick = { viewModel.triggerZeroTapTimeoutEscalation() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Text("Trigger Zero-Tap Timeout Escalation (Auto SMS+Call)", color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        }
+
+        item {
             OutlinedButton(
-                onClick = { viewModel.resetSyntheticSignals() },
+                onClick = {
+                    viewModel.resetSyntheticSignals()
+                    viewModel.resetAccident()
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Reset Synthetic Signals to Baseline")
+                Text("Reset All Signals & Accidents to Baseline")
             }
         }
 
         // ==========================================
-        // 4. LIVE HARDWARE TELEMETRY (Read-Only)
+        // 4. EDGE AI & ACCIDENT TELEMETRY
+        // ==========================================
+        item {
+            HospitableSectionHeader(title = "Edge AI & Vehicle Accident Telemetry")
+        }
+
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                tonalElevation = 2.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TelemetryRow("Active Edge AI Tier", when (aiTier) {
+                        InferenceTier.TIER_0_LOW_POWER_REST -> "TIER 0: Quiescent Sleep / Low Power"
+                        InferenceTier.TIER_1_LIGHTWEIGHT_INFERENCE -> "TIER 1: Lightweight Feature Inference"
+                        InferenceTier.TIER_2_INCIDENT_REASONING -> "TIER 2: Event-Triggered Incident Reasoning"
+                    })
+                    TelemetryRow("Accident Detector State", accidentState.name)
+                    if (accidentState == com.zerotap.domain.accident.AccidentState.USER_CHECK) {
+                        TelemetryRow("Grace Period Remaining", "$accidentCountdown seconds")
+                    }
+                    if (accidentEvidence != null) {
+                        TelemetryRow("Accident Evidence", "%.0f%% Confidence (%s)".format(
+                            accidentEvidence!!.confidence * 100,
+                            accidentEvidence!!.evidenceLevel.name
+                        ))
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. LIVE HARDWARE TELEMETRY (Read-Only)
         // ==========================================
         item {
             HospitableSectionHeader(title = "Live Physical Sensors (Nothing 2a)")

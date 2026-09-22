@@ -20,6 +20,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.zerotap.ui.accident.AccidentConfirmationScreen
 import com.zerotap.ui.contacts.TrustedContactsScreen
 import com.zerotap.ui.debug.DebugDashboardScreen
 import com.zerotap.ui.emergency.EmergencyCountdownScreen
@@ -40,8 +41,8 @@ fun NavGraph(
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            // Hide bottom bar during high-priority emergency countdown
-            if (currentRoute != Screen.EmergencyCountdown.route) {
+            // Hide bottom bar during high-priority emergency countdown or accident confirmation
+            if (currentRoute != Screen.EmergencyCountdown.route && currentRoute != Screen.AccidentConfirmation.route) {
                 NavigationBar {
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
@@ -121,6 +122,7 @@ fun NavGraph(
             composable(Screen.DebugDashboard.route) { DebugDashboardScreen(navController) }
             composable(Screen.ActiveIncident.route) { ActiveIncidentScreen(navController) }
             composable(Screen.EmergencyCountdown.route) { EmergencyCountdownScreen(navController) }
+            composable(Screen.AccidentConfirmation.route) { AccidentConfirmationScreen(navController) }
         }
     }
 }

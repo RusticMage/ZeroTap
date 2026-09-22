@@ -1,4 +1,4 @@
-package com.zerotap.ui.emergency
+package com.zerotap.ui.accident
 
 import android.content.Context
 import android.os.Build
@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.zerotap.data.datastore.UserPreferences
-import com.zerotap.domain.model.TemporalRiskState
+import com.zerotap.domain.accident.AccidentState
 import com.zerotap.domain.response.SmsDeliveryState
 import com.zerotap.service.ProtectionForegroundService
 import com.zerotap.ui.theme.ZtDarkBackground
@@ -38,23 +38,22 @@ import com.zerotap.ui.theme.ZtSafeOlive
 import com.zerotap.ui.theme.ZtWatchAmber
 
 @Composable
-fun EmergencyCountdownScreen(
+fun AccidentConfirmationScreen(
     navController: NavHostController
 ) {
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context.applicationContext) }
     val isDemoCallEnabled by userPreferences.demoEmergencyCallEnabled.collectAsStateWithLifecycle(initialValue = false)
 
-    val temporalState by ProtectionForegroundService.temporalRiskState.collectAsStateWithLifecycle()
-    val countdown by ProtectionForegroundService.countdownSeconds.collectAsStateWithLifecycle()
-    val prediction by ProtectionForegroundService.predictionResult.collectAsStateWithLifecycle()
-    val diag by ProtectionForegroundService.diagnostics.collectAsStateWithLifecycle()
+    val accidentState by ProtectionForegroundService.accidentState.collectAsStateWithLifecycle()
+    val countdown by ProtectionForegroundService.accidentCountdownSeconds.collectAsStateWithLifecycle()
+    val evidence by ProtectionForegroundService.accidentEvidence.collectAsStateWithLifecycle()
     val smsState by ProtectionForegroundService.smsDeliveryState.collectAsStateWithLifecycle()
     val callStatus by ProtectionForegroundService.emergencyCallStatus.collectAsStateWithLifecycle()
 
-    // Per-second subtle haptic feedback during countdown
+    // Gentle pulse vibration per second during grace period countdown
     LaunchedEffect(countdown) {
-        if (countdown > 0 && temporalState == TemporalRiskState.EMERGENCY_PENDING) {
+        if (countdown > 0 && accidentState == AccidentState.USER_CHECK) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
@@ -68,16 +67,16 @@ fun EmergencyCountdownScreen(
         }
     }
 
-    // Auto navigate back when user cancels or state normalizes
-    LaunchedEffect(temporalState) {
-        if (temporalState == TemporalRiskState.NORMAL) {
+    // Auto navigate back when user cancels or accident state normalizes
+    LaunchedEffect(accidentState) {
+        if (accidentState == AccidentState.NORMAL) {
             navController.popBackStack()
         }
     }
 
-    val isTriggered = temporalState == TemporalRiskState.EMERGENCY_TRIGGERED
-    val riskScore = prediction?.scorePercent ?: ((diag.currentRiskScore * 100).toInt())
-    val durationSeconds = prediction?.durationInCurrentStateSeconds ?: 0L
+    val isEscalated = accidentState == AccidentState.ESCALATING ||
+            accidentState == AccidentState.SMS_SENT ||
+            accidentState == AccidentState.CALL_INITIATED
 
     Column(
         modifier = Modifier
@@ -121,23 +120,24 @@ fun EmergencyCountdownScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = if (isTriggered) "EMERGENCY TRIGGERED" else "EMERGENCY RESPONSE PENDING",
+                text = if (isEscalated) "EMERGENCY ESCALATED" else "POSSIBLE VEHICLE ACCIDENT DETECTED",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (isTriggered) ZtIncidentCrimson else ZtHighRiskRust,
+                color = if (isEscalated) ZtIncidentCrimson else ZtHighRiskRust,
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Autonomous incident persistence: ${durationSeconds}s",
+                text = if (isEscalated) "Automatic zero-tap response dispatched" else "Are you okay? An impact signature was detected.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f)
+                color = Color.White.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
             )
         }
 
-        // CENTER: TACTILE COUNTDOWN & RISK CARD
+        // CENTER: TACTILE COUNTDOWN & EVIDENCE CARD
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
@@ -153,30 +153,7 @@ fun EmergencyCountdownScreen(
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "RISK SCORE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "$riskScore / 100",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = ZtIncidentCrimson
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = Color(0xFF362F2D))
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    if (!isTriggered) {
+                    if (!isEscalated) {
                         // 15-second visual countdown
                         Box(
                             contentAlignment = Alignment.Center,
@@ -204,8 +181,65 @@ fun EmergencyCountdownScreen(
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Kinematic Evidence Breakdown
+                        val ev = evidence
+                        if (ev != null) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF1E1A18),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "Kinematic Signatures Evaluated:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "• Impact Deceleration: %.1f m/s²".format(ev.peakAcceleration),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "• Kinematic Jerk: %.1f m/s³".format(ev.jerkMagnitude),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "• Angular Velocity: %.1f rad/s".format(ev.peakGyro),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White
+                                    )
+                                    if (ev.preImpactSpeedKmh != null && ev.postImpactSpeedKmh != null) {
+                                        Text(
+                                            text = "• Speed: %.0f → %.0f km/h".format(ev.preImpactSpeedKmh, ev.postImpactSpeedKmh),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = if (isDemoCallEnabled) {
+                                "If you do not respond before the timer expires, an emergency SMS and real phone call will be placed automatically."
+                            } else {
+                                "If you do not respond before the timer expires, an emergency SMS will be sent and phone call simulated automatically."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
                     } else {
-                        // Triggered: Reactive SMS and Call delivery status
+                        // Escalated State: Reactive SMS and Call delivery status
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(vertical = 12.dp)
@@ -218,14 +252,13 @@ fun EmergencyCountdownScreen(
                             )
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // P14: Reactive SMS status display
                             val (smsStatusText, smsColor) = when (val s = smsState) {
                                 is SmsDeliveryState.Sending -> Pair("SMS SENDING...", ZtWatchAmber)
                                 is SmsDeliveryState.Sent -> Pair("SMS SENT to ${s.contactName}", ZtSafeOlive)
                                 is SmsDeliveryState.Failed -> Pair("SMS FAILED: ${s.reason}", ZtHighRiskRust)
                                 is SmsDeliveryState.PermissionRequired -> Pair("SMS PERMISSION REQUIRED", ZtHighRiskRust)
                                 is SmsDeliveryState.NoPrimaryContact -> Pair("NO TRUSTED CONTACT CONFIGURED", ZtWatchAmber)
-                                is SmsDeliveryState.Idle -> Pair("SMS Prepared", Color.White)
+                                is SmsDeliveryState.Idle -> Pair("SMS Dispatched", Color.White)
                             }
 
                             Text(
@@ -238,37 +271,19 @@ fun EmergencyCountdownScreen(
 
                             Spacer(modifier = Modifier.height(4.dp))
 
-                            // P4: Reactive 112 Call status display
                             Text(
-                                text = callStatus ?: if (isDemoCallEnabled) "112 emergency call initiated" else "112 Call: Simulation Only (No real call made)",
+                                text = callStatus ?: if (isDemoCallEnabled) "Emergency call initiated" else "Call: Simulation Only (No real call made)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.85f),
                                 textAlign = TextAlign.Center
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(
-                        text = if (!isTriggered) {
-                            if (isDemoCallEnabled) {
-                                "Emergency SMS and a real 112 call will be placed automatically when countdown ends. Tap CANCEL below if safe."
-                            } else {
-                                "Emergency SMS will be sent and 112 call will be simulated when countdown ends. Tap CANCEL below if safe."
-                            }
-                        } else {
-                            "Emergency response workflow executed. Dispatched alerts to configured primary contact."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
 
-        // BOTTOM ACTION BUTTON: THE SOLE INTERACTION IS "I'M SAFE — CANCEL"
+        // BOTTOM ACTION BUTTON: THE SOLE INTERACTION IS "I'M FINE"
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -276,23 +291,23 @@ fun EmergencyCountdownScreen(
         ) {
             Button(
                 onClick = {
-                    ProtectionForegroundService.cancelEmergency()
+                    ProtectionForegroundService.userAffirmsFine()
                     navController.popBackStack()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
-                shape = RoundedCornerShape(18.dp),
+                    .height(64.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF2E3830),
                     contentColor = Color.White
                 )
             ) {
                 Text(
-                    text = if (isTriggered) "I'M SAFE — DISMISS" else "I'M SAFE — CANCEL",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    text = if (isEscalated) "I'M FINE — DISMISS" else "I'M FINE",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.2.sp
                 )
             }
         }
