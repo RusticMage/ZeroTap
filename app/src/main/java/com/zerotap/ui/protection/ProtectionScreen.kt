@@ -4,12 +4,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,194 +37,145 @@ fun ProtectionScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(top = 24.dp, bottom = 36.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Modern Header
         item {
-            Column {
-                Text(
-                    text = "Sensor Telemetry",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Live physical inputs & feature extraction from Nothing Phone (2a)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Protection Radar",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = if (isRunning) "All sensors actively monitoring" else "Protection paused",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                RiskStateBadge(state = diag.currentRiskState)
             }
         }
 
-        // 1. Pipeline Status Summary Card
+        // Live Sensors Grid/Card
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 2.dp
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = if (isRunning) "Pipeline Running" else "Pipeline Paused",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Rate: %.1f Hz · Total Samples: %d".format(diag.estimatedSamplingRateHz, diag.motionSampleCount),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    RiskStateBadge(state = diag.currentRiskState)
-                }
-            }
-        }
-
-        // 2. ACCELEROMETER SECTION
-        item {
-            HospitableSectionHeader(title = "1. Accelerometer (Real Hardware)")
-        }
-
-        item {
-            SensorValueCard(
-                title = "Linear 3-Axis Acceleration",
-                isAvailable = diag.isAccelerometerAvailable,
-                isActive = isRunning,
-                lines = listOf(
-                    "X-Axis" to "%.3f m/s²".format(diag.accelX),
-                    "Y-Axis" to "%.3f m/s²".format(diag.accelY),
-                    "Z-Axis" to "%.3f m/s²".format(diag.accelZ),
-                    "Euclidean Magnitude ||a||" to "%.3f m/s²".format(diag.accelMagnitude)
-                )
-            )
-        }
-
-        // 3. GYROSCOPE SECTION
-        item {
-            HospitableSectionHeader(title = "2. Gyroscope (Real Hardware)")
-        }
-
-        item {
-            SensorValueCard(
-                title = "Angular Velocity / Rotation Rate",
-                isAvailable = diag.isGyroscopeAvailable,
-                isActive = isRunning,
-                lines = listOf(
-                    "Roll (X)" to "%.3f rad/s".format(diag.gyroX),
-                    "Pitch (Y)" to "%.3f rad/s".format(diag.gyroY),
-                    "Yaw (Z)" to "%.3f rad/s".format(diag.gyroZ),
-                    "Angular Magnitude ||ω||" to "%.3f rad/s".format(diag.gyroMagnitude)
-                )
-            )
-        }
-
-        // 4. PREPROCESSED ML FEATURE VECTORS
-        item {
-            HospitableSectionHeader(title = "3. Statistical Feature Extraction (For ML Model)")
-        }
-
-        item {
-            SensorValueCard(
-                title = "Rolling Window Kinematics (2-3s Window)",
-                isAvailable = true,
-                isActive = isRunning,
-                lines = listOf(
-                    "Mean Acceleration" to "%.2f m/s²".format(diag.meanAccelMagnitude),
-                    "Peak Acceleration" to "%.2f m/s²".format(diag.peakAccelMagnitude),
-                    "Variance (Energy)" to "%.3f".format(diag.varianceAccelMagnitude),
-                    "Kinematic Jerk (da/dt)" to "%.2f m/s³".format(diag.jerkMagnitude),
-                    "Motion Classification" to "${diag.motionClassification.displayName} (%.0f%%)".format(diag.motionConfidence * 100)
-                )
-            )
-        }
-
-        // 5. ACOUSTIC & LOCATION CONTEXT
-        item {
-            HospitableSectionHeader(title = "4. Context & Environment")
-        }
-
-        item {
-            SensorValueCard(
-                title = "Acoustic Monitor (On-Device RMS)",
-                isAvailable = true,
-                isActive = isRunning && diag.isAudioAvailable,
-                lines = listOf(
-                    "Microphone Status" to if (diag.isAudioRecording) "Listening locally" else "Idle",
-                    "RMS Amplitude" to "%.1f dB".format(diag.audioAmplitudeDb),
-                    "Audio Classification" to diag.audioClassification.displayName
-                )
-            )
-        }
-
-        item {
-            SensorValueCard(
-                title = "Fused Location Provider",
-                isAvailable = true,
-                isActive = isRunning && diag.isLocationAvailable,
-                lines = listOf(
-                    "Coordinates" to if (diag.locationLatitude != null) "%.4f, %.4f".format(diag.locationLatitude, diag.locationLongitude) else "Acquiring fix...",
-                    "Accuracy" to if (diag.locationAccuracy != null) "±%.1f meters".format(diag.locationAccuracy) else "N/A",
-                    "Speed" to if (diag.locationSpeed != null) "%.1f m/s".format(diag.locationSpeed) else "0.0 m/s"
-                )
-            )
-        }
-
-        // 6. LIVE RISK ENGINE CONTRIBUTING SIGNALS
-        item {
-            HospitableSectionHeader(title = "5. Live Risk Signals Stream")
-        }
-
-        if (recentSignals.isEmpty()) {
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(
-                        text = if (isRunning) "No high-risk signals active. Phone in safe regime." else "Start protection on Home screen to observe live signals.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(18.dp)
+                        "Hardware Sensors",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    SensorTelemetryRow(
+                        name = "Accelerometer",
+                        isActive = isRunning && diag.isAccelerometerAvailable,
+                        primaryVal = "%.2f m/s²".format(diag.accelMagnitude),
+                        subVal = "${diag.motionClassification.displayName} · ${(diag.motionConfidence * 100).toInt()}%"
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    SensorTelemetryRow(
+                        name = "Gyroscope",
+                        isActive = isRunning && diag.isGyroscopeAvailable,
+                        primaryVal = "%.2f rad/s".format(diag.gyroMagnitude),
+                        subVal = "Roll: %.1f · Pitch: %.1f · Yaw: %.1f".format(diag.gyroX, diag.gyroY, diag.gyroZ)
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    SensorTelemetryRow(
+                        name = "Acoustic Audio",
+                        isActive = isRunning && diag.isAudioRecording,
+                        primaryVal = "%.1f dB".format(diag.audioAmplitudeDb),
+                        subVal = diag.audioClassification.displayName
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    SensorTelemetryRow(
+                        name = "GPS Location",
+                        isActive = isRunning && diag.isLocationAvailable,
+                        primaryVal = if (diag.locationLatitude != null) "%.4f, %.4f".format(diag.locationLatitude, diag.locationLongitude) else "Fix pending",
+                        subVal = if (diag.locationAccuracy != null) "±%.1fm · %.1f m/s".format(diag.locationAccuracy, diag.locationSpeed ?: 0f) else "Acquiring satellites"
                     )
                 }
             }
-        } else {
+        }
+
+        // Kinematic Analysis Card
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Kinematic Analysis",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        MetricBadge(label = "Peak Accel", value = "%.1f m/s²".format(diag.peakAccelMagnitude))
+                        MetricBadge(label = "Jerk (da/dt)", value = "%.1f m/s³".format(diag.jerkMagnitude))
+                        MetricBadge(label = "Sampling", value = "%.0f Hz".format(diag.estimatedSamplingRateHz))
+                    }
+                }
+            }
+        }
+
+        // Live Risk Signals
+        if (recentSignals.isNotEmpty()) {
+            item {
+                Text(
+                    "Active Risk Signals",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             items(recentSignals.size) { idx ->
                 val sig = recentSignals[idx]
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = sig.description,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Engine Weight: +%.2f".format(sig.weight),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Text(
+                            text = sig.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "+%.2f".format(sig.weight),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -230,68 +184,65 @@ fun ProtectionScreen(
 }
 
 @Composable
-private fun SensorValueCard(
-    title: String,
-    isAvailable: Boolean,
+private fun SensorTelemetryRow(
+    name: String,
     isActive: Boolean,
-    lines: List<Pair<String, String>>,
-    modifier: Modifier = Modifier
+    primaryVal: String,
+    subVal: String
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-        tonalElevation = 1.dp
+    val indicatorColor = if (isActive) androidx.compose.ui.graphics.Color(0xFF4CAF50) else androidx.compose.ui.graphics.Color(0xFFE53935)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = when {
-                        !isAvailable -> "NOT FOUND"
-                        isActive -> "STREAMING"
-                        else -> "STANDBY"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        // Prominent Status Circle: Green if Active, Red if Inactive
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(indicatorColor)
+        )
 
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            lines.forEach { (label, value) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = subVal,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+
+        Text(
+            text = primaryVal,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun MetricBadge(label: String, value: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

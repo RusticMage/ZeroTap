@@ -1,15 +1,23 @@
 {
   "emergency_resources": [
     {
-      "name": "Thousand Lights Police Station",
+      "name": "Greater Chennai Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 13.0827,
+      "longitude": 80.2707,
+      "phone": "044-23452359",
+      "address": "EVK Sampath Rd, Vepery, Chennai"
+    },
+    {
+      "name": "Thousand Lights Police Station (E-2)",
       "type": "POLICE",
       "latitude": 13.0601,
-      "longitude": 80.2520,
+      "longitude": 80.252,
       "phone": "044-28292121",
       "address": "Anna Salai, Thousand Lights, Chennai"
     },
     {
-      "name": "Mylapore Police Station",
+      "name": "Mylapore Police Station (E-1)",
       "type": "POLICE",
       "latitude": 13.0336,
       "longitude": 80.2675,
@@ -19,8 +27,8 @@
     {
       "name": "Anna Nagar Police Station (K-4)",
       "type": "POLICE",
-      "latitude": 13.0850,
-      "longitude": 80.2100,
+      "latitude": 13.085,
+      "longitude": 80.21,
       "phone": "044-26211111",
       "address": "2nd Avenue, Anna Nagar, Chennai"
     },
@@ -29,8 +37,8 @@
       "type": "POLICE",
       "latitude": 13.0418,
       "longitude": 80.2341,
-      "phone": "044-24340505",
-      "address": "Usman Road, T. Nagar, Chennai"
+      "phone": "044-24341400",
+      "address": "Thyagaraya Road, T. Nagar, Chennai"
     },
     {
       "name": "Adyar Police Station (J-2)",
@@ -49,76 +57,924 @@
       "address": "GST Road, Guindy, Chennai"
     },
     {
+      "name": "Tambaram Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 12.9249,
+      "longitude": 80.128,
+      "phone": "044-22266555",
+      "address": "GST Road, Tambaram, Chennai"
+    },
+    {
+      "name": "Avadi Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 13.1189,
+      "longitude": 80.1017,
+      "phone": "044-26380100",
+      "address": "CTH Road, Avadi, Chennai"
+    },
+    {
+      "name": "Royapettah Police Station",
+      "type": "POLICE",
+      "latitude": 13.0532,
+      "longitude": 80.2601,
+      "phone": "044-28481234",
+      "address": "Whites Road, Royapettah, Chennai"
+    },
+    {
       "name": "Rajiv Gandhi Govt General Hospital",
       "type": "HOSPITAL",
       "latitude": 13.0805,
-      "longitude": 80.2770,
+      "longitude": 80.277,
       "phone": "044-25305000",
       "address": "EVR Periyar Salai, Park Town, Chennai"
     },
     {
-      "name": "Apollo Hospitals Main Greams Road",
+      "name": "Govt Royapettah Hospital",
+      "type": "HOSPITAL",
+      "latitude": 13.0543,
+      "longitude": 80.2612,
+      "phone": "044-28483051",
+      "address": "Westcott Road, Royapettah, Chennai"
+    },
+    {
+      "name": "Apollo Hospitals Greams Road",
       "type": "HOSPITAL",
       "latitude": 13.0577,
-      "longitude": 80.2508,
+      "longitude": 80.2505,
       "phone": "044-28290200",
-      "address": "21 Greams Lane, Thousand Lights, Chennai"
+      "address": "Greams Lane, Thousand Lights, Chennai"
     },
     {
-      "name": "Fortis Malar Hospital",
+      "name": "Govt Kilpauk Medical College Hospital",
       "type": "HOSPITAL",
-      "latitude": 13.0076,
-      "longitude": 80.2582,
-      "phone": "044-42892222",
-      "address": "1st Main Road, Gandhi Nagar, Adyar, Chennai"
+      "latitude": 13.0784,
+      "longitude": 80.2415,
+      "phone": "044-28364951",
+      "address": "Poonamallee High Rd, Kilpauk, Chennai"
     },
     {
-      "name": "MIOT International Hospital",
-      "type": "HOSPITAL",
-      "latitude": 13.0232,
-      "longitude": 80.1873,
-      "phone": "044-42002288",
-      "address": "4/112 Mount Poonamallee Rd, Manapakkam, Chennai"
-    },
-    {
-      "name": "Govt Multi Super Speciality Hospital",
+      "name": "Govt Multi Super Speciality Hospital Omandurar",
       "type": "HOSPITAL",
       "latitude": 13.0694,
-      "longitude": 80.2731,
-      "phone": "044-25363000",
-      "address": "Omandurar Government Estate, Anna Salai, Chennai"
+      "longitude": 80.2747,
+      "phone": "044-25363100",
+      "address": "Omandurar Estate, Anna Salai, Chennai"
     },
     {
-      "name": "Puratchi Thalaivar Dr. MGR Central Metro",
+      "name": "Chennai Central Puratchi Thalaivar Railway & Metro",
       "type": "METRO",
-      "latitude": 13.0818,
-      "longitude": 80.2741,
-      "phone": "1860-425-1515",
-      "address": "Poonamallee High Rd, Chennai Central"
+      "latitude": 13.0823,
+      "longitude": 80.2755,
+      "phone": "044-25353545",
+      "address": "Kannappar Thidal, Periyamet, Chennai"
     },
     {
-      "name": "Guindy Metro Station",
+      "name": "Chennai Egmore Railway Station",
       "type": "METRO",
-      "latitude": 13.0090,
-      "longitude": 80.2125,
-      "phone": "1860-425-1515",
-      "address": "GST Road, Guindy, Chennai"
+      "latitude": 13.0789,
+      "longitude": 80.2608,
+      "phone": "044-28190241",
+      "address": "Gandhi Irwin Rd, Egmore, Chennai"
     },
     {
-      "name": "Chennai International Airport Metro",
+      "name": "Chennai International Airport Terminal",
       "type": "METRO",
-      "latitude": 12.9815,
-      "longitude": 80.1636,
-      "phone": "1860-425-1515",
+      "latitude": 12.9866,
+      "longitude": 80.1707,
+      "phone": "044-22560551",
       "address": "GST Road, Meenambakkam, Chennai"
     },
     {
-      "name": "Koyambedu Metro Station",
+      "name": "Puratchi Thalaivar Dr. MGR Bus Terminus (CMBT Koyambedu)",
       "type": "METRO",
-      "latitude": 13.0732,
-      "longitude": 80.1945,
-      "phone": "1860-425-1515",
-      "address": "Jawaharlal Nehru Road, Koyambedu, Chennai"
+      "latitude": 13.0692,
+      "longitude": 80.2056,
+      "phone": "044-24794707",
+      "address": "Jawaharlal Nehru Rd, Koyambedu, Chennai"
+    },
+    {
+      "name": "Kalaignar Centenary Bus Terminus (KCBT Kilambakkam)",
+      "type": "METRO",
+      "latitude": 12.8624,
+      "longitude": 80.0768,
+      "phone": "044-27472000",
+      "address": "GST Road, Kilambakkam, Vandalur"
+    },
+    {
+      "name": "Kanchipuram District Police Headquarters",
+      "type": "POLICE",
+      "latitude": 12.8342,
+      "longitude": 79.7036,
+      "phone": "044-27237033",
+      "address": "Collectorate Campus, Kanchipuram"
+    },
+    {
+      "name": "Govt District Headquarters Hospital Kanchipuram",
+      "type": "HOSPITAL",
+      "latitude": 12.8398,
+      "longitude": 79.7011,
+      "phone": "044-27222444",
+      "address": "Railway Station Rd, Kanchipuram"
+    },
+    {
+      "name": "Chengalpattu District Police Office",
+      "type": "POLICE",
+      "latitude": 12.6841,
+      "longitude": 79.9836,
+      "phone": "044-27426333",
+      "address": "GST Road, Chengalpattu"
+    },
+    {
+      "name": "Chengalpattu Govt Medical College & Hospital",
+      "type": "HOSPITAL",
+      "latitude": 12.692,
+      "longitude": 79.9772,
+      "phone": "044-27426566",
+      "address": "GST Road, Chengalpattu"
+    },
+    {
+      "name": "Thiruvallur District Police Office",
+      "type": "POLICE",
+      "latitude": 13.1438,
+      "longitude": 79.9079,
+      "phone": "044-27660200",
+      "address": "JN Road, Thiruvallur"
+    },
+    {
+      "name": "Govt Medical College Hospital Thiruvallur",
+      "type": "HOSPITAL",
+      "latitude": 13.1362,
+      "longitude": 79.9124,
+      "phone": "044-27661100",
+      "address": "NH 716, Thiruvallur"
+    },
+    {
+      "name": "Vellore District Police Headquarters / SP Office",
+      "type": "POLICE",
+      "latitude": 12.9165,
+      "longitude": 79.1325,
+      "phone": "0416-2252100",
+      "address": "Sathuvachari, Vellore"
+    },
+    {
+      "name": "Vellore North Police Station",
+      "type": "POLICE",
+      "latitude": 12.9248,
+      "longitude": 79.135,
+      "phone": "0416-2222233",
+      "address": "Katpadi Main Road, Vellore"
+    },
+    {
+      "name": "Christian Medical College (CMC) Hospital Vellore",
+      "type": "HOSPITAL",
+      "latitude": 12.9246,
+      "longitude": 79.1348,
+      "phone": "0416-2281000",
+      "address": "Ida Scudder Road, Vellore"
+    },
+    {
+      "name": "Govt Vellore Medical College Hospital Adukkamparai",
+      "type": "HOSPITAL",
+      "latitude": 12.871,
+      "longitude": 79.1328,
+      "phone": "0416-2260900",
+      "address": "Adukkamparai, Vellore"
+    },
+    {
+      "name": "Katpadi Junction Railway Station",
+      "type": "METRO",
+      "latitude": 12.9698,
+      "longitude": 79.1384,
+      "phone": "0416-2242255",
+      "address": "Chittoor Rd, Katpadi, Vellore"
+    },
+    {
+      "name": "Ranipet District Police Office",
+      "type": "POLICE",
+      "latitude": 12.9272,
+      "longitude": 79.333,
+      "phone": "04172-273100",
+      "address": "Collectorate Complex, Ranipet"
+    },
+    {
+      "name": "Tirupattur District Police Office",
+      "type": "POLICE",
+      "latitude": 12.495,
+      "longitude": 78.5678,
+      "phone": "04179-220100",
+      "address": "Tirupattur Main Road, Tirupattur"
+    },
+    {
+      "name": "Tiruvannamalai District SP Office",
+      "type": "POLICE",
+      "latitude": 12.2253,
+      "longitude": 79.0747,
+      "phone": "04175-233333",
+      "address": "Vengikkal, Tiruvannamalai"
+    },
+    {
+      "name": "Govt Tiruvannamalai Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 12.2471,
+      "longitude": 79.0664,
+      "phone": "04175-254500",
+      "address": "Outer Ring Road, Tiruvannamalai"
+    },
+    {
+      "name": "Coimbatore City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 11.0168,
+      "longitude": 76.9558,
+      "phone": "0422-2300251",
+      "address": "Huzur Road, Gopalapuram, Coimbatore"
+    },
+    {
+      "name": "Gandhipuram Police Station (B-2)",
+      "type": "POLICE",
+      "latitude": 11.018,
+      "longitude": 76.9674,
+      "phone": "0422-2232233",
+      "address": "Cross Cut Road, Gandhipuram, Coimbatore"
+    },
+    {
+      "name": "RS Puram Police Station (B-1)",
+      "type": "POLICE",
+      "latitude": 11.0112,
+      "longitude": 76.946,
+      "phone": "0422-2542100",
+      "address": "DB Road, RS Puram, Coimbatore"
+    },
+    {
+      "name": "Singanallur Police Station (E-2)",
+      "type": "POLICE",
+      "latitude": 11.0016,
+      "longitude": 77.0253,
+      "phone": "0422-2574100",
+      "address": "Trichy Road, Singanallur, Coimbatore"
+    },
+    {
+      "name": "Coimbatore Medical College Hospital (CMCH)",
+      "type": "HOSPITAL",
+      "latitude": 11.002,
+      "longitude": 76.968,
+      "phone": "0422-2301393",
+      "address": "Trichy Road, Gopalapuram, Coimbatore"
+    },
+    {
+      "name": "PSG Hospitals Peelamedu",
+      "type": "HOSPITAL",
+      "latitude": 11.0264,
+      "longitude": 77.0028,
+      "phone": "0422-2570170",
+      "address": "Avinashi Road, Peelamedu, Coimbatore"
+    },
+    {
+      "name": "G. Kuppuswamy Naidu Memorial Hospital (GKNM)",
+      "type": "HOSPITAL",
+      "latitude": 11.0135,
+      "longitude": 76.9818,
+      "phone": "0422-2245000",
+      "address": "P.N. Palayam, Coimbatore"
+    },
+    {
+      "name": "Coimbatore Junction Railway Station",
+      "type": "METRO",
+      "latitude": 10.9979,
+      "longitude": 76.9628,
+      "phone": "0422-2302255",
+      "address": "Station Road, Gopalapuram, Coimbatore"
+    },
+    {
+      "name": "Gandhipuram Central Bus Stand",
+      "type": "METRO",
+      "latitude": 11.0175,
+      "longitude": 76.9688,
+      "phone": "0422-2521100",
+      "address": "Dr Nanjappa Rd, Gandhipuram, Coimbatore"
+    },
+    {
+      "name": "Coimbatore International Airport",
+      "type": "METRO",
+      "latitude": 11.0298,
+      "longitude": 77.0434,
+      "phone": "0422-2592155",
+      "address": "Civil Aerodrome Post, Peelamedu, Coimbatore"
+    },
+    {
+      "name": "Tiruppur City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 11.1085,
+      "longitude": 77.3411,
+      "phone": "0421-2970010",
+      "address": "Palladam Road, Tiruppur"
+    },
+    {
+      "name": "Govt Medical College Hospital Tiruppur",
+      "type": "HOSPITAL",
+      "latitude": 11.112,
+      "longitude": 77.3485,
+      "phone": "0421-2242100",
+      "address": "Dharapuram Road, Tiruppur"
+    },
+    {
+      "name": "Erode District Police Headquarters / SP Office",
+      "type": "POLICE",
+      "latitude": 11.341,
+      "longitude": 77.7172,
+      "phone": "0424-2260100",
+      "address": "Perundurai Road, Erode"
+    },
+    {
+      "name": "Govt Headquarters Hospital Erode",
+      "type": "HOSPITAL",
+      "latitude": 11.3456,
+      "longitude": 77.7265,
+      "phone": "0424-2252100",
+      "address": "Brough Road, Erode"
+    },
+    {
+      "name": "Salem City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 11.6643,
+      "longitude": 78.146,
+      "phone": "0427-2210100",
+      "address": "Linemedu, Salem"
+    },
+    {
+      "name": "Salem Town Police Station",
+      "type": "POLICE",
+      "latitude": 11.6538,
+      "longitude": 78.1592,
+      "phone": "0427-2260222",
+      "address": "First Agraharam, Salem"
+    },
+    {
+      "name": "Govt Mohan Kumaramangalam Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 11.6601,
+      "longitude": 78.154,
+      "phone": "0427-2211200",
+      "address": "Fort Main Road, Salem"
+    },
+    {
+      "name": "Salem Junction Railway Station (Suramangalam)",
+      "type": "METRO",
+      "latitude": 11.6738,
+      "longitude": 78.1172,
+      "phone": "0427-2448255",
+      "address": "Suramangalam, Salem"
+    },
+    {
+      "name": "Namakkal District Police Headquarters",
+      "type": "POLICE",
+      "latitude": 11.2189,
+      "longitude": 78.1674,
+      "phone": "04286-281001",
+      "address": "Thummankurichi, Namakkal"
+    },
+    {
+      "name": "Govt Medical College Hospital Namakkal",
+      "type": "HOSPITAL",
+      "latitude": 11.2265,
+      "longitude": 78.172,
+      "phone": "04286-280100",
+      "address": "Collectorate Road, Namakkal"
+    },
+    {
+      "name": "Udhagamandalam (Ooty) Police Station",
+      "type": "POLICE",
+      "latitude": 11.4102,
+      "longitude": 76.695,
+      "phone": "0423-2442222",
+      "address": "Commercial Road, Ooty, Nilgiris"
+    },
+    {
+      "name": "Govt Medical College Hospital Ooty",
+      "type": "HOSPITAL",
+      "latitude": 11.4135,
+      "longitude": 76.7024,
+      "phone": "0423-2442212",
+      "address": "Hospital Road, Fingerpost, Ooty"
+    },
+    {
+      "name": "Dharmapuri District Police Office",
+      "type": "POLICE",
+      "latitude": 12.1357,
+      "longitude": 78.1584,
+      "phone": "04342-230100",
+      "address": "Collectorate Campus, Dharmapuri"
+    },
+    {
+      "name": "Govt Dharmapuri Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 12.132,
+      "longitude": 78.161,
+      "phone": "04342-233000",
+      "address": "Netaji Bypass Rd, Dharmapuri"
+    },
+    {
+      "name": "Krishnagiri District Police Office",
+      "type": "POLICE",
+      "latitude": 12.5186,
+      "longitude": 78.2138,
+      "phone": "04343-236100",
+      "address": "Rayakottah Road, Krishnagiri"
+    },
+    {
+      "name": "Hosur Town Police Station",
+      "type": "POLICE",
+      "latitude": 12.7409,
+      "longitude": 77.8253,
+      "phone": "04344-222333",
+      "address": "Bagalur Road, Hosur"
+    },
+    {
+      "name": "Govt Hospital Hosur",
+      "type": "HOSPITAL",
+      "latitude": 12.735,
+      "longitude": 77.829,
+      "phone": "04344-222055",
+      "address": "Denkanikottai Rd, Hosur"
+    },
+    {
+      "name": "Tiruchirappalli City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 10.7905,
+      "longitude": 78.7047,
+      "phone": "0431-2412500",
+      "address": "Cantonment, Tiruchirappalli"
+    },
+    {
+      "name": "Trichy Fort Police Station",
+      "type": "POLICE",
+      "latitude": 10.8271,
+      "longitude": 78.6948,
+      "phone": "0431-2704100",
+      "address": "Main Guard Gate, Trichy"
+    },
+    {
+      "name": "Thillai Nagar Police Station",
+      "type": "POLICE",
+      "latitude": 10.821,
+      "longitude": 78.682,
+      "phone": "0431-2761200",
+      "address": "Salai Road, Thillai Nagar, Trichy"
+    },
+    {
+      "name": "Mahatma Gandhi Memorial Govt Hospital (MGMGH)",
+      "type": "HOSPITAL",
+      "latitude": 10.8122,
+      "longitude": 78.6914,
+      "phone": "0431-2412521",
+      "address": "Collector Office Rd, Cantonment, Trichy"
+    },
+    {
+      "name": "Tiruchirappalli Junction Railway Station",
+      "type": "METRO",
+      "latitude": 10.7944,
+      "longitude": 78.6853,
+      "phone": "0431-2460555",
+      "address": "Junction Road, Cantonment, Trichy"
+    },
+    {
+      "name": "Tiruchirappalli International Airport",
+      "type": "METRO",
+      "latitude": 10.7654,
+      "longitude": 78.7126,
+      "phone": "0431-2340551",
+      "address": "Old Terminal Rd, Trichy"
+    },
+    {
+      "name": "Thanjavur District SP Office",
+      "type": "POLICE",
+      "latitude": 10.787,
+      "longitude": 79.1378,
+      "phone": "04362-230100",
+      "address": "Court Road, Thanjavur"
+    },
+    {
+      "name": "Thanjavur Medical College Hospital (TMCH)",
+      "type": "HOSPITAL",
+      "latitude": 10.758,
+      "longitude": 79.1065,
+      "phone": "04362-240024",
+      "address": "Medical College Rd, Thanjavur"
+    },
+    {
+      "name": "Thanjavur Junction Railway Station",
+      "type": "METRO",
+      "latitude": 10.7765,
+      "longitude": 79.136,
+      "phone": "04362-231155",
+      "address": "Railway Station Rd, Thanjavur"
+    },
+    {
+      "name": "Karur District Police Headquarters",
+      "type": "POLICE",
+      "latitude": 10.9601,
+      "longitude": 78.0766,
+      "phone": "04324-255100",
+      "address": "Thanthonimalai, Karur"
+    },
+    {
+      "name": "Govt Medical College Hospital Karur",
+      "type": "HOSPITAL",
+      "latitude": 10.9385,
+      "longitude": 78.082,
+      "phone": "04324-256000",
+      "address": "Sanapiratti, Karur"
+    },
+    {
+      "name": "Pudukkottai District Police Office",
+      "type": "POLICE",
+      "latitude": 10.3797,
+      "longitude": 78.8208,
+      "phone": "04322-221100",
+      "address": "Kalyanaramapuram, Pudukkottai"
+    },
+    {
+      "name": "Govt Medical College Hospital Pudukkottai",
+      "type": "HOSPITAL",
+      "latitude": 10.3662,
+      "longitude": 78.8055,
+      "phone": "04322-222300",
+      "address": "Trichy Main Rd, Pudukkottai"
+    },
+    {
+      "name": "Nagapattinam District SP Office",
+      "type": "POLICE",
+      "latitude": 10.7656,
+      "longitude": 79.8424,
+      "phone": "04365-242100",
+      "address": "Public Office Rd, Nagapattinam"
+    },
+    {
+      "name": "Govt Medical College Hospital Nagapattinam",
+      "type": "HOSPITAL",
+      "latitude": 10.772,
+      "longitude": 79.838,
+      "phone": "04365-242055",
+      "address": "Perumal Sannathi Rd, Nagapattinam"
+    },
+    {
+      "name": "Tiruvarur District Police Office",
+      "type": "POLICE",
+      "latitude": 10.7725,
+      "longitude": 79.6365,
+      "phone": "04366-224100",
+      "address": "Vilamal, Tiruvarur"
+    },
+    {
+      "name": "Govt Tiruvarur Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 10.761,
+      "longitude": 79.628,
+      "phone": "04366-222000",
+      "address": "Vilamal, Tiruvarur"
+    },
+    {
+      "name": "Mayiladuthurai District Police Office",
+      "type": "POLICE",
+      "latitude": 11.1075,
+      "longitude": 79.6523,
+      "phone": "04364-222100",
+      "address": "Kamarajar Salai, Mayiladuthurai"
+    },
+    {
+      "name": "Perambalur District SP Office",
+      "type": "POLICE",
+      "latitude": 11.2342,
+      "longitude": 78.882,
+      "phone": "04328-277100",
+      "address": "Elambalur, Perambalur"
+    },
+    {
+      "name": "Ariyalur District Police Office",
+      "type": "POLICE",
+      "latitude": 11.1401,
+      "longitude": 79.0782,
+      "phone": "04329-228100",
+      "address": "Jayankondam Rd, Ariyalur"
+    },
+    {
+      "name": "Madurai City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 9.9252,
+      "longitude": 78.1198,
+      "phone": "0452-2530100",
+      "address": "Alagar Kovil Road, K.Pudur, Madurai"
+    },
+    {
+      "name": "Madurai Town Police Station (B-1)",
+      "type": "POLICE",
+      "latitude": 9.9195,
+      "longitude": 78.118,
+      "phone": "0452-2342100",
+      "address": "South Veli Street, Madurai"
+    },
+    {
+      "name": "Anna Nagar Police Station Madurai",
+      "type": "POLICE",
+      "latitude": 9.9268,
+      "longitude": 78.1485,
+      "phone": "0452-2524100",
+      "address": "80 Feet Road, Anna Nagar, Madurai"
+    },
+    {
+      "name": "Govt Rajaji Hospital (GRH)",
+      "type": "HOSPITAL",
+      "latitude": 9.9328,
+      "longitude": 78.1325,
+      "phone": "0452-2532535",
+      "address": "Panagal Road, Shenoy Nagar, Madurai"
+    },
+    {
+      "name": "Apollo Speciality Hospitals Madurai",
+      "type": "HOSPITAL",
+      "latitude": 9.9272,
+      "longitude": 78.151,
+      "phone": "0452-2580880",
+      "address": "Lake View Road, K.K. Nagar, Madurai"
+    },
+    {
+      "name": "Madurai Junction Railway Station",
+      "type": "METRO",
+      "latitude": 9.9174,
+      "longitude": 78.1114,
+      "phone": "0452-2308255",
+      "address": "Railway Colony, Madurai"
+    },
+    {
+      "name": "Madurai Integrated Bus Terminus (Mattuthavani MIBT)",
+      "type": "METRO",
+      "latitude": 9.9492,
+      "longitude": 78.1634,
+      "phone": "0452-2561100",
+      "address": "Melur Road, Mattuthavani, Madurai"
+    },
+    {
+      "name": "Madurai Airport",
+      "type": "METRO",
+      "latitude": 9.8345,
+      "longitude": 78.0934,
+      "phone": "0452-2690717",
+      "address": "Airport Road, Avaniyapuram, Madurai"
+    },
+    {
+      "name": "Dindigul District SP Office",
+      "type": "POLICE",
+      "latitude": 10.3673,
+      "longitude": 77.9803,
+      "phone": "0451-2460100",
+      "address": "Collectorate Complex, Dindigul"
+    },
+    {
+      "name": "Govt Medical College Hospital Dindigul",
+      "type": "HOSPITAL",
+      "latitude": 10.362,
+      "longitude": 77.9734,
+      "phone": "0451-2432200",
+      "address": "Nellikombu, Dindigul"
+    },
+    {
+      "name": "Theni District Police Headquarters",
+      "type": "POLICE",
+      "latitude": 10.0104,
+      "longitude": 77.4768,
+      "phone": "04546-253100",
+      "address": "Collectorate Campus, Theni"
+    },
+    {
+      "name": "Govt Theni Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 10.0028,
+      "longitude": 77.5512,
+      "phone": "04546-244500",
+      "address": "K.V.R. Maligai, Kanavilakku, Theni"
+    },
+    {
+      "name": "Virudhunagar District SP Office",
+      "type": "POLICE",
+      "latitude": 9.568,
+      "longitude": 77.9624,
+      "phone": "04562-252500",
+      "address": "Collectorate Complex, Virudhunagar"
+    },
+    {
+      "name": "Govt Medical College Hospital Virudhunagar",
+      "type": "HOSPITAL",
+      "latitude": 9.585,
+      "longitude": 77.954,
+      "phone": "04562-243100",
+      "address": "Madurai Road, Virudhunagar"
+    },
+    {
+      "name": "Sivagangai District Police Headquarters",
+      "type": "POLICE",
+      "latitude": 9.8433,
+      "longitude": 78.4809,
+      "phone": "04575-240400",
+      "address": "Maruthupandiyar Nagar, Sivagangai"
+    },
+    {
+      "name": "Govt Medical College Hospital Sivagangai",
+      "type": "HOSPITAL",
+      "latitude": 9.851,
+      "longitude": 78.475,
+      "phone": "04575-241200",
+      "address": "Manamadurai Rd, Sivagangai"
+    },
+    {
+      "name": "Ramanathapuram District SP Office",
+      "type": "POLICE",
+      "latitude": 9.3639,
+      "longitude": 78.8395,
+      "phone": "04567-230021",
+      "address": "Collectorate Post, Ramanathapuram"
+    },
+    {
+      "name": "Govt Medical College Hospital Ramanathapuram",
+      "type": "HOSPITAL",
+      "latitude": 9.3712,
+      "longitude": 78.832,
+      "phone": "04567-220055",
+      "address": "Kenikarai, Ramanathapuram"
+    },
+    {
+      "name": "Rameswaram Temple Police Station",
+      "type": "POLICE",
+      "latitude": 9.2881,
+      "longitude": 79.3174,
+      "phone": "04573-221223",
+      "address": "East Car Street, Rameswaram"
+    },
+    {
+      "name": "Tirunelveli City Police Commissionerate",
+      "type": "POLICE",
+      "latitude": 8.7139,
+      "longitude": 77.7567,
+      "phone": "0462-2572100",
+      "address": "Palayamkottai, Tirunelveli"
+    },
+    {
+      "name": "Tirunelveli Town Police Station",
+      "type": "POLICE",
+      "latitude": 8.7302,
+      "longitude": 77.689,
+      "phone": "0462-2333200",
+      "address": "Swamy Sannathi, Tirunelveli Town"
+    },
+    {
+      "name": "Tirunelveli Medical College Hospital (TVMCH)",
+      "type": "HOSPITAL",
+      "latitude": 8.7058,
+      "longitude": 77.7472,
+      "phone": "0462-2572733",
+      "address": "High Ground, Palayamkottai, Tirunelveli"
+    },
+    {
+      "name": "Tirunelveli Junction Railway Station",
+      "type": "METRO",
+      "latitude": 8.7285,
+      "longitude": 77.7136,
+      "phone": "0462-2331555",
+      "address": "Railway Feeder Rd, Tirunelveli"
+    },
+    {
+      "name": "Tenkasi District Police Office",
+      "type": "POLICE",
+      "latitude": 8.9594,
+      "longitude": 77.315,
+      "phone": "04633-280100",
+      "address": "Collectorate Campus, Tenkasi"
+    },
+    {
+      "name": "Govt District Headquarters Hospital Tenkasi",
+      "type": "HOSPITAL",
+      "latitude": 8.9632,
+      "longitude": 77.311,
+      "phone": "04633-222233",
+      "address": "Kollam Rd, Tenkasi"
+    },
+    {
+      "name": "Thoothukudi District SP Office",
+      "type": "POLICE",
+      "latitude": 8.7642,
+      "longitude": 78.1348,
+      "phone": "0461-2340100",
+      "address": "Korampallam, Thoothukudi"
+    },
+    {
+      "name": "Govt Thoothukudi Medical College Hospital",
+      "type": "HOSPITAL",
+      "latitude": 8.8021,
+      "longitude": 78.1465,
+      "phone": "0461-2382100",
+      "address": "3rd Mile, Kamaraj Nagar, Thoothukudi"
+    },
+    {
+      "name": "VO Chidambaranar Port & Railway",
+      "type": "METRO",
+      "latitude": 8.7512,
+      "longitude": 78.175,
+      "phone": "0461-2352290",
+      "address": "Harbour Estate, Thoothukudi"
+    },
+    {
+      "name": "Kanyakumari District SP Office (Nagercoil)",
+      "type": "POLICE",
+      "latitude": 8.1833,
+      "longitude": 77.4119,
+      "phone": "04652-220100",
+      "address": "Collectorate Complex, Nagercoil"
+    },
+    {
+      "name": "Kanyakumari Coastal Police Station",
+      "type": "POLICE",
+      "latitude": 8.0792,
+      "longitude": 77.5512,
+      "phone": "04652-246224",
+      "address": "Beach Road, Kanyakumari"
+    },
+    {
+      "name": "Kanyakumari Govt Medical College Hospital (Asaripallam)",
+      "type": "HOSPITAL",
+      "latitude": 8.1915,
+      "longitude": 77.398,
+      "phone": "04652-223201",
+      "address": "Asaripallam, Nagercoil"
+    },
+    {
+      "name": "Nagercoil Junction Railway Station",
+      "type": "METRO",
+      "latitude": 8.1712,
+      "longitude": 77.4358,
+      "phone": "04652-241255",
+      "address": "Railway Station Rd, Nagercoil"
+    },
+    {
+      "name": "Kanniyakumari Railway Terminus",
+      "type": "METRO",
+      "latitude": 8.0844,
+      "longitude": 77.5488,
+      "phone": "04652-246244",
+      "address": "Cape Comorin Terminus, Kanyakumari"
+    },
+    {
+      "name": "Cuddalore District SP Office",
+      "type": "POLICE",
+      "latitude": 11.748,
+      "longitude": 79.7714,
+      "phone": "04142-284100",
+      "address": "Imperial Road, Cuddalore"
+    },
+    {
+      "name": "Govt Medical College Hospital Cuddalore",
+      "type": "HOSPITAL",
+      "latitude": 11.751,
+      "longitude": 79.765,
+      "phone": "04142-222300",
+      "address": "Hospital Road, Cuddalore"
+    },
+    {
+      "name": "Villupuram District SP Office",
+      "type": "POLICE",
+      "latitude": 11.9401,
+      "longitude": 79.4861,
+      "phone": "04146-222100",
+      "address": "Master Plan Complex, Villupuram"
+    },
+    {
+      "name": "Govt Villupuram Medical College Hospital (Mundiyampakkam)",
+      "type": "HOSPITAL",
+      "latitude": 12.0125,
+      "longitude": 79.5218,
+      "phone": "04146-232500",
+      "address": "NH 45, Mundiyampakkam, Villupuram"
+    },
+    {
+      "name": "Villupuram Junction Railway Station",
+      "type": "METRO",
+      "latitude": 11.936,
+      "longitude": 79.4925,
+      "phone": "04146-241255",
+      "address": "Station Rd, Villupuram"
+    },
+    {
+      "name": "Kallakurichi District SP Office",
+      "type": "POLICE",
+      "latitude": 11.738,
+      "longitude": 78.9634,
+      "phone": "04151-222100",
+      "address": "Collectorate Campus, Kallakurichi"
+    },
+    {
+      "name": "Govt Medical College Hospital Kallakurichi",
+      "type": "HOSPITAL",
+      "latitude": 11.745,
+      "longitude": 78.958,
+      "phone": "04151-223500",
+      "address": "Siruvachur, Kallakurichi"
     }
   ]
 }

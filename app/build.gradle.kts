@@ -80,6 +80,9 @@ dependencies {
     // Location Services
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
+    // On-Device ML Kit Text Recognition (Real Offline On-Device OCR)
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+
     // Core KTX
     implementation("androidx.core:core-ktx:1.15.0")
 

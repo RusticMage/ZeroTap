@@ -64,21 +64,38 @@ class AudioDataSource(private val context: Context) : SensorDataSource<AudioMeta
                     val readSize = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (readSize > 0) {
                         var maxAmplitude = 0
+                        var sumSquares = 0.0
+                        var zeroCrossings = 0
+                        var prevSample = buffer[0].toInt()
+
                         for (i in 0 until readSize) {
-                            val absVal = Math.abs(buffer[i].toInt())
+                            val sample = buffer[i].toInt()
+                            val absVal = Math.abs(sample)
                             if (absVal > maxAmplitude) {
                                 maxAmplitude = absVal
                             }
+                            sumSquares += sample.toDouble() * sample.toDouble()
+                            if ((sample >= 0 && prevSample < 0) || (sample < 0 && prevSample >= 0)) {
+                                zeroCrossings++
+                            }
+                            prevSample = sample
                         }
                         
-                        // Calculate dB
-                        val amplitudeDb = if (maxAmplitude > 0) 20 * log10(maxAmplitude.toDouble()) else 0.0
+                        // Calculate RMS dB and Peak Amplitude dB
+                        val meanSquare = sumSquares / readSize
+                        val rms = kotlin.math.sqrt(meanSquare)
+                        val rmsDb = if (rms > 0.0) (20 * log10(rms)).toFloat() else 0f
+                        val amplitudeDb = if (maxAmplitude > 0) (20 * log10(maxAmplitude.toDouble())).toFloat() else 0f
+                        val zcr = zeroCrossings.toFloat() / readSize.toFloat()
                         
                         _dataFlow.tryEmit(
                             AudioMetadata(
                                 timestamp = System.currentTimeMillis(),
-                                amplitudeDb = amplitudeDb.toFloat(),
-                                isRecording = true
+                                amplitudeDb = amplitudeDb,
+                                isRecording = true,
+                                rmsDb = rmsDb,
+                                peakAmplitude = maxAmplitude,
+                                zeroCrossingRate = zcr
                             )
                         )
                     }

@@ -14,6 +14,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -28,6 +29,7 @@ import com.zerotap.ui.history.IncidentHistoryScreen
 import com.zerotap.ui.home.HomeScreen
 import com.zerotap.ui.incident.ActiveIncidentScreen
 import com.zerotap.ui.map.MapScreen
+import com.zerotap.ui.onboarding.OnboardingScreen
 import com.zerotap.ui.protection.ProtectionScreen
 import com.zerotap.ui.settings.SettingsScreen
 
@@ -36,23 +38,29 @@ fun NavGraph(
     navController: NavHostController,
     appContext: Context
 ) {
+    val onboardingCompleted by com.zerotap.ServiceLocator.userPreferences.onboardingCompleted
+        .collectAsState(initial = true)
+
     Scaffold(
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
 
-            // Hide bottom bar during high-priority emergency countdown or accident confirmation
-            if (currentRoute != Screen.EmergencyCountdown.route && currentRoute != Screen.AccidentConfirmation.route) {
+            // Hide bottom bar during onboarding, emergency countdown or accident confirmation
+            if (currentRoute != Screen.Onboarding.route &&
+                currentRoute != Screen.EmergencyCountdown.route &&
+                currentRoute != Screen.AccidentConfirmation.route) {
                 NavigationBar {
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                         label = { Text("Home") },
                         selected = currentRoute == Screen.Home.route,
                         onClick = {
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (currentRoute != Screen.Home.route) {
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(Screen.Home.route) { inclusive = true }
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -61,10 +69,10 @@ fun NavGraph(
                         label = { Text("History") },
                         selected = currentRoute == Screen.IncidentHistory.route,
                         onClick = {
-                            navController.navigate(Screen.IncidentHistory.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (currentRoute != Screen.IncidentHistory.route) {
+                                navController.navigate(Screen.IncidentHistory.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -73,10 +81,10 @@ fun NavGraph(
                         label = { Text("Map") },
                         selected = currentRoute == Screen.Map.route,
                         onClick = {
-                            navController.navigate(Screen.Map.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (currentRoute != Screen.Map.route) {
+                                navController.navigate(Screen.Map.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -85,10 +93,10 @@ fun NavGraph(
                         label = { Text("Contacts") },
                         selected = currentRoute == Screen.TrustedContacts.route,
                         onClick = {
-                            navController.navigate(Screen.TrustedContacts.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (currentRoute != Screen.TrustedContacts.route) {
+                                navController.navigate(Screen.TrustedContacts.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -97,10 +105,10 @@ fun NavGraph(
                         label = { Text("Settings") },
                         selected = currentRoute == Screen.Settings.route,
                         onClick = {
-                            navController.navigate(Screen.Settings.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            if (currentRoute != Screen.Settings.route) {
+                                navController.navigate(Screen.Settings.route) {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     )
@@ -110,9 +118,18 @@ fun NavGraph(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = if (!onboardingCompleted) Screen.Onboarding.route else Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onFinished = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(Screen.Home.route) { HomeScreen(navController) }
             composable(Screen.Protection.route) { ProtectionScreen(navController) }
             composable(Screen.IncidentHistory.route) { IncidentHistoryScreen(navController) }
@@ -123,6 +140,9 @@ fun NavGraph(
             composable(Screen.ActiveIncident.route) { ActiveIncidentScreen(navController) }
             composable(Screen.EmergencyCountdown.route) { EmergencyCountdownScreen(navController) }
             composable(Screen.AccidentConfirmation.route) { AccidentConfirmationScreen(navController) }
+            composable(Screen.VehiclePlateCapture.route) {
+                com.zerotap.ui.evidence.VehiclePlateCaptureScreen(navController)
+            }
         }
     }
 }

@@ -13,9 +13,12 @@ import com.zerotap.data.db.entity.*
         RiskEventEntity::class,
         TrustedContactEntity::class,
         EvidenceMetadataEntity::class,
-        AlertAttemptEntity::class
+        AlertAttemptEntity::class,
+        SafeSpaceEntity::class,
+        EvidenceItemEntity::class,
+        TrustedPlaceEntity::class
     ],
-    version = 1,
+    version = 4,
     exportSchema = false
 )
 abstract class ZeroTapDatabase : RoomDatabase() {
@@ -24,6 +27,9 @@ abstract class ZeroTapDatabase : RoomDatabase() {
     abstract fun trustedContactDao(): TrustedContactDao
     abstract fun evidenceMetadataDao(): EvidenceMetadataDao
     abstract fun alertAttemptDao(): AlertAttemptDao
+    abstract fun safeSpaceDao(): SafeSpaceDao
+    abstract fun evidenceItemDao(): EvidenceItemDao
+    abstract fun trustedPlaceDao(): TrustedPlaceDao
 
     companion object {
         @Volatile private var INSTANCE: ZeroTapDatabase? = null

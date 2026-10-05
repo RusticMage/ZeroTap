@@ -15,10 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,12 +42,15 @@ fun SettingsScreen(
     val demoEmergencyCall by viewModel.demoEmergencyCall.collectAsStateWithLifecycle()
     val contacts by viewModel.trustedContacts.collectAsStateWithLifecycle()
     val isProtectionActive by viewModel.isProtectionActive.collectAsStateWithLifecycle()
+    val deploymentMode by viewModel.deploymentMode.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
     var isSendingTestSms by remember { mutableStateOf(false) }
     var testSmsResult by remember { mutableStateOf<SmsDeliveryResult?>(null) }
     var showTestDialog by remember { mutableStateOf(false) }
     var showCallPermissionRationale by remember { mutableStateOf(false) }
+    var showByokDialog by remember { mutableStateOf(false) }
+    var byokKeyInput by remember { mutableStateOf("") }
 
     // Runtime permission launcher for SEND_SMS
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -100,7 +105,7 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // 1. APPEARANCE SECTION
+        // 1. APPEARANCE
         // ==========================================
         item {
             HospitableSectionHeader(title = "Appearance")
@@ -111,25 +116,15 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 1.dp
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         text = "Theme Preference",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Select light, dark (#161412), or follow system default",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
                     Spacer(modifier = Modifier.height(14.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -149,10 +144,10 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // 2. PROTECTION SECTION
+        // 2. NETWORK & DEPLOYMENT
         // ==========================================
         item {
-            HospitableSectionHeader(title = "Protection Pipeline")
+            HospitableSectionHeader(title = "Network & Cloud Sync")
         }
 
         item {
@@ -160,39 +155,84 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 1.dp
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "Background Monitor",
+                            text = "Deployment Mode",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (isProtectionActive) "Running continuously at 1000ms intervals" else "Paused. Enable on Home screen.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isProtectionActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = deploymentMode.displayName,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = deploymentMode == com.zerotap.core.config.DeploymentMode.PRIVATE,
+                            onClick = { viewModel.setDeploymentMode(com.zerotap.core.config.DeploymentMode.PRIVATE) },
+                            label = { Text("Private") },
+                            modifier = Modifier.weight(1f)
                         )
+                        FilterChip(
+                            selected = deploymentMode == com.zerotap.core.config.DeploymentMode.SERVER,
+                            onClick = { viewModel.setDeploymentMode(com.zerotap.core.config.DeploymentMode.SERVER) },
+                            label = { Text("Connected") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (deploymentMode == com.zerotap.core.config.DeploymentMode.PRIVATE) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "AI API Key",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (viewModel.hasByokKey()) "Key configured" else "Using default model",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(onClick = { showByokDialog = true }) {
+                                Text(if (viewModel.hasByokKey()) "Update" else "Add Key")
+                            }
+                        }
                     }
                 }
             }
         }
 
         // ==========================================
-        // 3. EMERGENCY SECTION
+        // 3. EMERGENCY CONTACTS
         // ==========================================
         item {
-            HospitableSectionHeader(title = "Emergency Response")
+            HospitableSectionHeader(title = "Emergency Contacts")
         }
 
         item {
@@ -200,8 +240,7 @@ fun SettingsScreen(
                 onClick = { navController.navigate(Screen.TrustedContacts.route) },
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 1.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -212,30 +251,33 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Trusted Contacts",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
                         val primary = contacts.firstOrNull { it.isPrimary } ?: contacts.firstOrNull()
                         Text(
-                            text = if (primary != null) "Primary: ${primary.name} (${primary.phone})" else "${contacts.size} contacts configured (No contact set)",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = if (primary != null) "${primary.name} · ${primary.phone}" else "No contacts configured",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${contacts.size} contact(s) enrolled",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Text("MANAGE >", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Manage >",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
 
         // ==========================================
-        // 4. PRIVACY SECTION
+        // 4. TESTING & SIMULATION
         // ==========================================
         item {
-            HospitableSectionHeader(title = "Privacy & Safety")
+            HospitableSectionHeader(title = "Testing & Diagnostics")
         }
 
         item {
@@ -243,73 +285,22 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                tonalElevation = 1.dp
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "100% On-Device Processing Guarantee",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Raw accelerometer, gyroscope, and microphone data are computed strictly in-memory on your phone. No raw sensor streams are ever uploaded to any cloud server.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        // ==========================================
-        // 5. DEVELOPER & DEMO SETTINGS (Visually Separated)
-        // ==========================================
-        item {
-            HospitableSectionHeader(title = "Developer & Demo Settings")
-        }
-
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, ZtWatchAmber.copy(alpha = 0.5f)),
-                tonalElevation = 2.dp
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // DEMO EMERGENCY CALL TOGGLE (CRITICAL SAFETY GUARD)
+                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Demo Emergency Call",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (demoEmergencyCall) ZtHighRiskRust else MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (demoEmergencyCall) ZtHighRiskRust.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = if (demoEmergencyCall) "REAL CALL ON" else "SIMULATED",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (demoEmergencyCall) ZtHighRiskRust else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "OFF: emergency call is simulated only.\nON: the app can place the configured emergency call.",
+                                text = "Emergency Call",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (demoEmergencyCall) "Calls 112 directly on confirmation" else "Simulation mode only",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -327,52 +318,89 @@ fun SettingsScreen(
                                 } else {
                                     viewModel.toggleDemoEmergencyCall(false)
                                 }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ZtHighRiskRust
-                            )
+                            }
                         )
                     }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    // TEST EMERGENCY CONTACT BUTTON (P2 & P18 Independent Test)
-                    OutlinedButton(
-                        onClick = {
-                            val hasSmsPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
-                            if (!hasSmsPerm) {
-                                smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
-                            } else {
-                                scope.launch {
-                                    isSendingTestSms = true
-                                    val res = viewModel.sendTestSms()
-                                    isSendingTestSms = false
-                                    testSmsResult = res
-                                    showTestDialog = true
-                                }
-                            }
-                        },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = !isSendingTestSms
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isSendingTestSms) "Sending Test SMS..." else "Test Emergency Contact SMS",
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        OutlinedButton(
+                            onClick = {
+                                val hasSmsPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+                                if (!hasSmsPerm) {
+                                    smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                } else {
+                                    scope.launch {
+                                        isSendingTestSms = true
+                                        val res = viewModel.sendTestSms()
+                                        isSendingTestSms = false
+                                        testSmsResult = res
+                                        showTestDialog = true
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSendingTestSms
+                        ) {
+                            Text(if (isSendingTestSms) "Sending..." else "Send Test SMS")
+                        }
+
+                        FilledTonalButton(
+                            onClick = { navController.navigate(Screen.DebugDashboard.route) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Diagnostics")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. ABOUT
+        // ==========================================
+        item {
+            HospitableSectionHeader(title = "About")
+        }
+
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("ZT", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        }
+                        Column {
+                            Text("ZeroTap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Version 1.0.0", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
 
-                    // OPEN SYNTHETIC TEST HARNESS / CONSOLE
-                    FilledTonalButton(
-                        onClick = { navController.navigate(Screen.DebugDashboard.route) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Text("Open Developer Simulation Console", fontWeight = FontWeight.SemiBold)
-                    }
+                    Text(
+                        "Zero-interaction personal safety system with real-time sensor anomaly detection and automated emergency escalation.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -445,6 +473,58 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showCallPermissionRationale = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // BYOK API KEY VAULT DIALOG
+    if (showByokDialog) {
+        AlertDialog(
+            onDismissRequest = { showByokDialog = false },
+            title = { Text("BYOK AI API Key Vault") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Enter your private AI API key (OpenAI, Gemini, Claude). The key is hardware-encrypted via Android KeyStore (AES-GCM-256) and never sent to ZeroTap servers.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = byokKeyInput,
+                        onValueChange = { byokKeyInput = it },
+                        label = { Text("API Key") },
+                        placeholder = { Text("sk-...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (byokKeyInput.isNotBlank()) {
+                            viewModel.saveByokKey(byokKeyInput.trim())
+                        }
+                        showByokDialog = false
+                    }
+                ) {
+                    Text("Save Key")
+                }
+            },
+            dismissButton = {
+                if (viewModel.hasByokKey()) {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearByokKey()
+                            showByokDialog = false
+                        }
+                    ) {
+                        Text("Delete Key", color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    TextButton(onClick = { showByokDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
             }
         )

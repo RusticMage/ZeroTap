@@ -44,7 +44,10 @@ data class LocationSample(
 data class AudioMetadata(
     val timestamp: Long,
     val amplitudeDb: Float,
-    val isRecording: Boolean
+    val isRecording: Boolean,
+    val rmsDb: Float = amplitudeDb,
+    val peakAmplitude: Int = 0,
+    val zeroCrossingRate: Float = 0f
 )
 
 /**

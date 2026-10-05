@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroTap — Emergency Responder Command Center</title>
+  <link rel="stylesheet" href="/styles.css">
+  
+  <!-- Leaflet CSS & JS for OpenStreetMap display -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- SockJS and STOMP for real-time WebSockets -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo">ZT</div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="brand-title">ZeroTap Command Center</span>
+          <span class="brand-badge">Responder Edition</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">
+          Autonomous Edge-to-Cloud Safety & Emergency Monitoring
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div id="contact-header-status" style="display: flex; align-items: center; gap: 8px;">
+        <button class="action-btn btn-outline" id="btn-open-pairing" onclick="openPairingModal()" style="display: flex; align-items: center; gap: 6px;">
+          <span>🔗</span> <span id="header-pair-label">Connect to Phone</span>
+        </button>
+      </div>
+      <div class="connection-indicator">
+        <span class="pulse-dot" id="ws-pulse"></span>
+        <span id="ws-status">Connecting to Gateway...</span>
+      </div>
+      <button class="theme-toggle-btn" id="theme-btn" onclick="toggleTheme()">
+        <span id="theme-icon">☀️ Light Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Metrics Overview Bar -->
+  <section class="metrics-row">
+    <div class="metric-card">
+      <span class="metric-label">Active Incidents</span>
+      <span class="metric-value" id="stat-incidents" style="color: var(--status-safe);">0</span>
+      <span class="metric-subtext" id="stat-incidents-sub">All devices safe & secured</span>
+    </div>
+
+    <div class="metric-card">
+      <span class="metric-label">Linked Devices</span>
+      <span class="metric-value" id="stat-devices" style="color: var(--accent-green-primary);">0</span>
+      <span class="metric-subtext">Active telemetry streams</span>
+    </div>
+
+    <div class="metric-card">
+      <span class="metric-label">Safe Spaces (Tamil Nadu)</span>
+      <span class="metric-value" id="stat-safespaces" style="color: var(--status-safe);">122</span>
+      <span class="metric-subtext">Police, Hospitals & Transit Hubs</span>
+    </div>
+
+    <div class="metric-card">
+      <span class="metric-label">Vertex AI Gateway</span>
+      <span class="metric-value" style="color: var(--accent-green-primary); font-size: 20px;">Gemma-4 Live</span>
+      <span class="metric-subtext">us-central1 / Edge Cloud Hybrid</span>
+    </div>
+  </section>
+
+  <!-- Main Dashboard Workspace -->
+  <main class="dashboard-grid">
+    <!-- Map Canvas Panel -->
+    <section class="map-panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Tamil Nadu Real-Time Safety Radar</h2>
+          <span style="font-size: 12px; color: var(--text-muted);">Statewide emergency assets & active device telemetry</span>
+        </div>
+        <div class="filter-pills">
+          <button class="pill-btn active" onclick="filterSpaces('ALL')">All Assets</button>
+          <button class="pill-btn" onclick="filterSpaces('POLICE')">Police</button>
+          <button class="pill-btn" onclick="filterSpaces('HOSPITAL')">Hospitals</button>
+          <button class="pill-btn" onclick="filterSpaces('TRANSIT_HUB')">Transit Hubs</button>
+        </div>
+      </div>
+      <div id="map"></div>
+    </section>
+
+    <!-- Incidents & Devices Sidebar -->
+    <aside class="sidebar-panel">
+
+      <!-- Dedicated Emergency Contact / Phone-to-Web Hub -->
+      <div class="contact-panel" id="contact-hub-card">
+        <div class="contact-header">
+          <div>
+            <h2 class="panel-title" id="contact-hub-title">Emergency Contact Center</h2>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="contact-hub-subtitle">
+              Secure 1:1 Phone-to-Web Link
+            </div>
+          </div>
+          <span id="contact-status-badge" class="badge-offline">Not Paired</span>
+        </div>
+
+        <!-- Unpaired State View -->
+        <div id="contact-unpaired-view">
+          <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px;">
+            Connect with a ZeroTap phone user using the 6-digit pairing code to monitor live telemetry and check on their safety.
+          </p>
+          <button class="action-btn btn-ping" onclick="openPairingModal()" style="width: 100%; padding: 10px; font-size: 13px;">
+            🔗 Connect with 6-Digit Code
+          </button>
+        </div>
+
+        <!-- Paired Monitored User View (Hidden until paired) -->
+        <div id="contact-paired-view" style="display: none;">
+          <div style="padding: 10px; background: var(--bg-surface-variant); border-radius: var(--radius-sm); margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);" id="monitored-user-name">User</span>
+              <span id="monitored-device-id" style="font-size: 11px; color: var(--text-muted); font-family: monospace;"></span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">
+              <strong>Telemetry:</strong> <span id="monitored-telemetry-text">Waiting for GPS...</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              <strong>Last Updated:</strong> <span id="monitored-updated-text">Just now</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <button class="action-btn btn-ping" id="btn-ping-paired" onclick="pingPairedUser()" style="flex: 2; padding: 10px 14px; font-weight: 700;">
+              🚨 Ping User: Are you OK?
+            </button>
+            <button class="action-btn btn-outline" onclick="focusMonitoredUser()" style="flex: 1; padding: 10px 8px;">
+              📍 Locate
+            </button>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+            <button class="action-btn btn-outline" onclick="unpairContact()" style="font-size: 11px; padding: 4px 10px; color: var(--status-critical);">
+              Disconnect Contact
+            </button>
+          </div>
+
+          <!-- Dynamic Response Banner -->
+          <div id="contact-ping-status-banner" style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- Active Emergency Queue (RED ONLY WHEN ACTIVE) -->
+      <div class="incidents-card">
+        <div class="panel-header">
+          <h2 class="panel-title">Active Emergency Queue</h2>
+          <button class="pill-btn" onclick="refreshIncidents()">Refresh</button>
+        </div>
+        <div class="incidents-list" id="incidents-container">
+          <div class="empty-state">No active emergencies detected. All devices safe.</div>
+        </div>
+      </div>
+
+      <!-- Linked Monitored Devices -->
+      <div class="devices-card">
+        <div class="panel-header">
+          <h2 class="panel-title">Linked Monitored Devices</h2>
+          <span class="badge-safe" id="badge-device-status">Live GPS</span>
+        </div>
+        <div class="devices-list" id="devices-container">
+          <div class="empty-state">Waiting for connected device telemetry...</div>
+        </div>
+      </div>
+
+      <!-- Vehicle Plate Evidence Locker -->
+      <div class="devices-card" style="margin-top: 16px;">
+        <div class="panel-header">
+          <h2 class="panel-title">Vehicle Evidence Locker</h2>
+          <span class="badge-safe" id="badge-evidence-status">Live Sync</span>
+        </div>
+        <div class="devices-list" id="evidence-container">
+          <div class="empty-state">No vehicle plates logged yet.</div>
+        </div>
+      </div>
+
+      <!-- Quick Remote Check-in / Diagnostics Trigger -->
+      <div class="checkin-card">
+        <div class="panel-header">
+          <h2 class="panel-title">Remote Check-In / Ping</h2>
+        </div>
+        <div style="padding: 16px;">
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+            Send an instant safety ping to any enrolled device. If the user doesn't respond within 30s, escalating alerts are triggered.
+          </p>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="target-device-id" class="modal-input" placeholder="Device or User ID" value="user-device-1" style="margin-bottom: 0;">
+            <button class="action-btn btn-ping" onclick="triggerManualPing()" style="white-space: nowrap; padding: 0 16px;">
+              Send Ping
+            </button>
+          </div>
+          <div id="ping-status-msg" style="font-size: 11px; margin-top: 8px; color: var(--text-muted);"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Resolve Incident Modal -->
+  <div class="modal-overlay" id="resolve-modal">
+    <div class="modal-content">
+      <h3 class="modal-title">Resolve Incident</h3>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+        Provide resolution notes for incident <span id="modal-incident-id" style="font-weight: 700; color: var(--text-primary);"></span>:
+      </p>
+      <input type="text" id="modal-summary" class="modal-input" placeholder="e.g., False alarm, user confirmed safe over call">
+      <div class="modal-actions">
+        <button class="action-btn btn-outline" onclick="closeResolveModal()">Cancel</button>
+        <button class="action-btn btn-resolve" onclick="confirmResolveIncident()">Confirm Resolution</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evidence Image Preview Modal -->
+  <div class="modal-overlay" id="image-modal">
+    <div class="modal-content" style="max-width: 520px; text-align: center;">
+      <h3 class="modal-title" id="image-modal-title">Evidence Photo</h3>
+      <div style="margin: 16px 0; border-radius: 8px; overflow: hidden; background: #000;">
+        <img id="image-modal-img" src="" alt="Evidence Photo" style="width: 100%; max-height: 380px; object-fit: contain; display: block;">
+      </div>
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="action-btn btn-outline" onclick="closeImageModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Emergency Contact Pairing Modal -->
+  <div class="modal-overlay" id="pairing-modal">
+    <div class="modal-content" style="max-width: 460px;">
+      <h3 class="modal-title">Connect to Phone User</h3>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4;">
+        Enter the single-use 6-digit pairing code generated in the ZeroTap Android app (Settings &rarr; Emergency Contacts &rarr; Connect Web Center).
+      </p>
+
+      <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">
+        6-Digit Pairing Code
+      </label>
+      <input type="text" id="pairing-code-input" class="modal-input pairing-input-code" placeholder="000 000" maxlength="6" autofocus>
+
+      <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">
+        Your Name / Relationship
+      </label>
+      <input type="text" id="pairing-name-input" class="modal-input" placeholder="e.g. Sarah (Sister) or Mom" value="Primary Contact">
+
+      <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">
+        Phone Number (Optional)
+      </label>
+      <input type="text" id="pairing-phone-input" class="modal-input" placeholder="+91 98765 43210">
+
+      <div id="pairing-error-msg" style="color: var(--status-critical); font-size: 12px; margin-bottom: 12px; display: none;"></div>
+
+      <div class="modal-actions">
+        <button class="action-btn btn-outline" onclick="closePairingModal()">Cancel</button>
+        <button class="action-btn btn-ping" id="btn-submit-pairing" onclick="submitPairingCode()">Establish Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

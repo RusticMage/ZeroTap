@@ -6,6 +6,7 @@ import com.zerotap.domain.model.*
 import com.zerotap.domain.risk.DevelopmentRiskPredictionEngine
 import com.zerotap.domain.risk.RiskPredictionEngine
 import com.zerotap.sensor.audio.AudioInferenceEngine
+import com.zerotap.sensor.audio.RobustAudioEngine
 import com.zerotap.sensor.feature.ExtractedMotionFeatures
 import com.zerotap.sensor.feature.SensorFeatureExtractor
 import com.zerotap.sensor.feature.StandardSensorFeatureExtractor
@@ -90,17 +91,25 @@ class HierarchicalInferenceCoordinator(
 
         var audioContext: AudioContext? = null
         if (audioMetadata != null) {
-            val pred = audioEngine.classify(audioMetadata, recentAudio)
-            audioContext = AudioContext(
-                timestamp = System.currentTimeMillis(),
-                voiceActivityDetected = audioMetadata.amplitudeDb > 55f,
-                elevatedVocalEnergy = audioMetadata.amplitudeDb > 70f,
-                distressLikePattern = pred.classification == AudioClassification.DISTRESS_SOUND,
-                loudImpactDetected = pred.classification == AudioClassification.LOUD_ACOUSTIC_EVENT,
-                ambientLevelDb = audioMetadata.amplitudeDb,
-                classificationLabel = pred.classification.displayName,
-                confidence = pred.confidence
-            )
+            audioContext = if (audioEngine is RobustAudioEngine) {
+                audioEngine.analyzeToContext(audioMetadata, recentAudio)
+            } else if (audioEngine is DevelopmentAudioInferenceEngine) {
+                audioEngine.analyzeToContext(audioMetadata, recentAudio)
+            } else {
+                val pred = audioEngine.classify(audioMetadata, recentAudio)
+                AudioContext(
+                    timestamp = System.currentTimeMillis(),
+                    detectedClass = pred.classification,
+                    confidence = pred.confidence,
+                    anomalyScore = if (pred.classification == AudioClassification.DISTRESS_SOUND) 0.7f else 0.1f,
+                    ambientLevelDb = audioMetadata.amplitudeDb,
+                    voiceActivityDetected = audioMetadata.amplitudeDb > 55f,
+                    elevatedVocalEnergy = audioMetadata.amplitudeDb > 70f,
+                    distressLikePattern = pred.classification == AudioClassification.DISTRESS_SOUND,
+                    loudImpactDetected = pred.classification == AudioClassification.LOUD_ACOUSTIC_EVENT,
+                    classificationLabel = pred.classification.displayName
+                )
+            }
         }
 
         val unifiedContext = UnifiedSensorContext(

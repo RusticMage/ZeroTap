@@ -82,4 +82,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         return transport.sendSms(testPayload)
     }
+
+    private val credentialStore = com.zerotap.ServiceLocator.secureCredentialStore
+
+    val deploymentMode: StateFlow<com.zerotap.core.config.DeploymentMode> = userPreferences.deploymentMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.zerotap.core.config.AppConfiguration.currentMode)
+
+    fun setDeploymentMode(mode: com.zerotap.core.config.DeploymentMode) {
+        viewModelScope.launch {
+            userPreferences.setDeploymentMode(mode)
+            com.zerotap.core.config.AppConfiguration.currentMode = mode
+        }
+    }
+
+    fun hasByokKey(): Boolean = credentialStore.hasApiKey("BYOK_PROVIDER")
+
+    fun saveByokKey(key: String): Boolean = credentialStore.saveApiKey("BYOK_PROVIDER", key)
+
+    fun clearByokKey() = credentialStore.clearApiKey()
 }
+

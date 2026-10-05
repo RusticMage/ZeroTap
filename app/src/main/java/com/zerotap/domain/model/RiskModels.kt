@@ -41,6 +41,16 @@ sealed class RiskSignal {
         override val description: String,
         val deviationMeters: Float
     ) : RiskSignal()
+
+    data class TrustedPlaceProximitySignal(
+        override val timestamp: Long,
+        override val weight: Float = 0f, // Contextual only: does not suppress emergency danger
+        override val description: String,
+        val nearTrustedPlace: Boolean,
+        val trustedPlaceId: String?,
+        val trustedPlaceType: String?,
+        val distanceMeters: Float
+    ) : RiskSignal()
 }
 
 enum class LocationSignalType {

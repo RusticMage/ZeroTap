@@ -35,6 +35,9 @@ enum class AudioClassification(val displayName: String) {
     DISTRESS_SOUND("Distress Sound"),
     LOUD_ACOUSTIC_EVENT("Loud Acoustic Event"),
     SILENCE("Silence"),
+    SPEECH("Speech"),
+    TRAFFIC("Traffic"),
+    SHOUTING("Shouting"),
     UNKNOWN("Unknown")
 }
 

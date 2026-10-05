@@ -1,226 +1,117 @@
-# ZeroTap – Zero-User-Action Incident Detection System
+# ZeroTap
 
-> **ZeroTap** is an on-device personal safety system designed around zero-user-action incident detection. It continuously interprets phone sensor context to detect abnormal or risk-escalating situations without requiring the user to unlock their phone or press an SOS button.
+ZeroTap is an Android personal-safety prototype. While protection is running, a foreground service collects motion, location and microphone-level metadata, evaluates risk locally, and can prompt or escalate a suspected vehicle accident. The project contains two related risk/incident paths; this README documents the code that is currently wired and calls out unfinished or disconnected parts.
 
-Developed for physical Android devices (demonstrated on iQOO Android devices).
+> **Project status:** prototype / development implementation. Motion and audio classifiers and risk scoring are deterministic heuristics, not trained models. Review the [current behavior and limitations](#current-behavior-and-limitations) before treating this as an emergency-response product.
 
----
+## Architecture and end-to-end flows
 
-## Architecture Overview
-
-ZeroTap uses a strict unidirectional detection and decision pipeline:
-
-```
-+-------------------------------------------------------------+
-|                      PHONE SENSORS                          |
-|   Accelerometer  *  Gyroscope  *  Fused Location  *  Mic     |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                     SENSOR MANAGERS                         |
-|   MotionDataSource  *  LocationDataSource  *  AudioData     |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                 NORMALIZED SENSOR EVENTS                    |
-|   MotionSample  *  LocationSample  *  AudioMetadata         |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                   AI / SIGNAL DETECTORS                     |
-|   MotionInferenceEngine  *  AudioInferenceEngine            |
-|   LocationContextAnalyzer                                   |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                        RISK ENGINE                          |
-|   DevelopmentRiskEngine (Deterministic Multi-Signal Scorer) |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                   INCIDENT STATE MACHINE                    |
-|   NORMAL -> WATCH -> SUSPICIOUS -> HIGH_RISK -> INCIDENT    |
-+-------------------------------------------------------------+
-                               |
-                               v
-+-------------------------------------------------------------+
-|                      INCIDENT MANAGER                       |
-|   Coordinates evidence freeze, local summarizer & alerts    |
-+-------------------------------------------------------------+
-          |                    |                     |
-          v                    v                     v
-+------------------+ +--------------------+ +-----------------+
-| ENCRYPTED BUFFER | | LOCAL SUMMARIZER   | | ALERT MANAGER   |
-| Rolling 60s      | | Template /         | | Internet, SMS   |
-| Keystore AES-GCM | | Future Local LLM   | | BT/WiFi Direct  |
-+------------------+ +--------------------+ +-----------------+
+```mermaid
+flowchart TB
+  subgraph Android[Android app]
+    UI[Compose UI / ViewModels] -->|start, stop, controls| SVC[ProtectionForegroundService]
+    SVC --> M[MotionDataSource<br/>accelerometer + gyroscope]
+    SVC --> L[LocationDataSource<br/>fused location]
+    SVC --> A[AudioDataSource<br/>PCM to amplitude metadata]
+    M -->|MotionSample| RB[Rolling windows + evidence buffer]
+    L -->|LocationSample| RB
+    A -->|AudioMetadata; raw samples discarded| RB
+    M --> W[1-second evaluation loop]
+    L --> W
+    A --> W
+    W --> Q{Quiescent and risk normal?}
+    Q -->|yes| IDLE[Tier 0: skip this evaluation]
+    Q -->|no| FE[Feature extraction + heuristic motion/audio classification]
+    FE --> RP[DevelopmentRiskPredictionEngine<br/>multimodal feature score]
+    RP --> TT[TemporalRiskTracker<br/>risk state + emergency countdown]
+    TT --> RM[ResponseManager]
+    RM -->|emergency triggered| CONTACTS[Room trusted contacts]
+    CONTACTS --> SMS[SMS dispatch]
+    SMS --> CALL[Call initiation attempt]
+    FE --> VD[VehicleAccidentDetector]
+    VD --> AS[VehicleAccidentStateMachine]
+    AS -->|possible accident| PROMPT[Vibration + spoken prompt + grace countdown]
+    PROMPT -->|user affirms fine| CANCEL[Cancel escalation]
+    PROMPT -->|timeout| RM
+    W --> LEGACY[Legacy RiskEngine / IncidentManager path]
+    RB --> SNAP[In-memory EvidenceSnapshot on freeze]
+    UI <-->|StateFlows / controls| SVC
+    UI --> DB[(Room: incidents, contacts, risk events,<br/>evidence metadata, alert attempts)]
+    SVC --> DB
+    PREF[DataStore preferences] <--> UI
+    PREF <--> SVC
+  end
+  INTERNET[InternetAlertTransport] -. configured in legacy path;<br/>no current incident trigger .-> LEGACY
+  MESH[Bluetooth / Wi-Fi Direct placeholders] -. unavailable stubs .-> LEGACY
 ```
 
-### Safety Rule Enforced in Code
-Individual sensor detectors **never** trigger alerts directly:
-- Sensor Detectors -> Structured Signals (`AudioSignal`, `MotionSignal`, `LocationSignal`, `RouteSignal`)
-- Signals -> `RiskEngine`
-- `RiskAssessment` -> `IncidentManager`
-- `IncidentManager` -> `ResponsePolicy` & `AlertManager`
+### 1. App startup and protection lifecycle
 
----
+`MainActivity` applies the Compose theme and creates the navigation graph. Screens and ViewModels expose settings, contacts, history, protection telemetry, incident controls, maps, and a developer dashboard. The protection flow starts `ProtectionForegroundService`, which constructs sensor sources, Room repositories, preferences, risk components, and response handlers. It starts motion, location, and audio collection and publishes service state through `StateFlow`s. The manifest declares the foreground service as location and microphone typed.
 
-## Implemented Features
+### 2. Sensor ingestion and rolling context
 
-### 1. Sensor Layer
-- **MotionDataSource**: High-frequency accelerometer and gyroscope listener; computes 3D Euclidean magnitude and standard deviation across rolling motion windows.
-- **LocationDataSource**: Fused Location Provider client emitting timestamped coordinates, speed, bearing, and accuracy.
-- **AudioDataSource**: On-device PCM 16-bit 16kHz audio monitor calculating real-time amplitude in dB without recording or storing raw acoustic feeds.
-- **LocationContextAnalyzer**: Detects unexpected stops, prolonged stationary events, and route deviations.
+- `MotionDataSource` emits accelerometer/gyroscope samples into a short feature window and the evidence ring buffer.
+- `LocationDataSource` emits fused location samples into location history and the evidence ring buffer. `LocationContextAnalyzer` evaluates movement and unexpected stops.
+- `AudioDataSource` reads microphone PCM and emits amplitude metadata; the service keeps metadata, not PCM, in its rolling history/evidence buffer.
+- The evidence buffer is in-memory: 600 motion samples, 12 location samples, and 120 audio metadata records. `freeze()` returns a snapshot of current contents.
 
-### 2. Risk Engine & State Machine
-- **States**: `NORMAL`, `WATCH`, `SUSPICIOUS`, `HIGH_RISK`, `INCIDENT`, `RESOLVED`.
-- **Deterministic Multi-Signal Scoring**:
-  - Distress Audio: `+0.35`
-  - Abrupt Motion (drop / sudden jerk): `+0.20` to `+0.25`
-  - Unexpected Stop: `+0.15`
-  - Prolonged Stop: `+0.20`
-  - Route Deviation: `+0.15`
-- Implements state **hysteresis** to prevent rapid flapping across severity levels.
-- Fully labeled as a development scoring engine ready for trained ML models.
+### 3. One-second personal-safety risk path
 
-### 3. Rolling Evidence Black Box
-- Circular in-memory buffer (`RollingEvidenceBuffer`) storing up to 60 seconds of pre-incident sensor history (motion samples, location fixes, and audio metadata).
-- **Incident Freeze**: When risk elevates to `INCIDENT`, the pre-incident window is locked and combined with post-incident data into an `EvidenceSnapshot`.
-- **Encryption**: Backed by **Android Keystore** AES-GCM with hardware-isolated keys (`EvidenceEncryptionService`). No raw keys or plaintext records are saved.
+Every second, the service first checks a cheap quiescence condition. If the phone appears still and quiet while temporal risk and accident state are normal, that evaluation is skipped. Otherwise the service extracts motion features, runs the development motion/audio heuristics, builds `UnifiedSensorContext`, and calls `DevelopmentRiskPredictionEngine`. `TemporalRiskTracker` updates state and countdown, and `ResponseManager` receives each tick. At `EMERGENCY_TRIGGERED`, it deduplicates by event ID, selects the primary (or first available) trusted contact, attempts SMS, then attempts a phone call even if SMS failed. The call transport can run in simulation mode according to preferences.
 
-### 4. Alert & Communication Abstraction
-- `AlertTransport` interface with pluggable dispatch strategies:
-  - **InternetAlertTransport**: Sends JSON payload to user-configured safety endpoints.
-  - **SmsAlertTransport**: SMS fallback via Android `SmsManager` providing coordinates and Google Maps link to trusted contacts.
-  - **BluetoothRelayTransport & WifiDirectRelayTransport**: Clean architecture placeholders for future off-grid mesh communications.
-- **AlertManager**: Fallback dispatch policy ensuring message delivery even under spotty network conditions.
+The service also converts the same sensor context into `RiskSignal`s for the legacy `DevelopmentRiskEngine` and `IncidentManager` path. These are separate scoring/state flows with different thresholds and semantics; see [Current behavior and limitations](#current-behavior-and-limitations).
 
-### 5. AI Engine Interfaces & Local Summarizer
-- Clean interfaces for future on-device ML:
-  - `MotionInferenceEngine` (`DevelopmentMotionInferenceEngine` & `FutureOnDeviceMotionInferenceEngine` stub)
-  - `AudioInferenceEngine` (`DevelopmentAudioInferenceEngine` & `FutureOnDeviceAudioInferenceEngine` stub)
-  - `LocalIncidentSummarizer` (`DevelopmentIncidentSummarizer` & `FutureOnDeviceLlmSummarizer` stub)
-- The development summarizer synthesizes structured timelines into human-readable situation reports without external network calls.
+### 4. Vehicle-accident path
 
-### 6. Persistence & Offline Operation
-- **Room Database**: Tables for `incidents`, `risk_events`, `trusted_contacts`, `evidence_metadata`, and `alert_attempts`.
-- **DataStore**: Preferences for sampling intervals, alert endpoints, and debug modes.
+The service evaluates extracted motion features and recent location samples with `VehicleAccidentDetector`. Impact/deceleration, jerk, rotation, post-impact stillness and optional GPS speed collapse contribute to heuristic confidence; continued vehicle speed and resumed walking can reduce it. `VehicleAccidentStateMachine` moves through verification and, on sufficient evidence, enters a user-check countdown with vibration, a spoken prompt, and a notification. User confirmation cancels the sequence. Timeout calls `ResponseManager.onAccidentEscalation`, which sends an accident-labeled SMS and attempts a call to the selected contact.
 
-### 7. Background Protection Service
-- `ProtectionForegroundService`: Persistent foreground service maintaining sensor collection, inference, and evidence buffering while surviving screen off and app switching.
+### 5. Persistence, evidence, and communications
 
-### 8. User Interface (Jetpack Compose)
-- **Home**: Protection ON/OFF toggle, live risk state badge, risk score meter, and active signal cards.
-- **Protection Mode**: In-depth telemetry, buffer capacity meters, and live signal feed.
-- **Active Incident**: Live emergency screen showing frozen evidence status, alert delivery log, and dismiss/resolve controls.
-- **Incident History**: Room-backed list of past incidents with status and timestamps.
-- **Trusted Contacts**: Add, view, and manage emergency phone numbers.
-- **Settings**: Adjust sensor frequencies, set alert endpoint, and open the debug dashboard.
-- **Developer Simulation Dashboard**: Injects real signals (`SUDDEN_JERK`, `DISTRESS_SOUND`, `UNEXPECTED_STOP`, `COMBINED_INCIDENT`) directly into the actual `RiskEngine` pipeline for testing.
+Room stores incidents, trusted contacts, risk events, evidence metadata, and alert attempts through DAOs/repositories. DataStore stores user preferences. A separate `EvidenceEncryptionService` can encrypt a snapshot using an Android Keystore AES-GCM key and write an encrypted file, but the currently wired service/incident path does not call that service or persist the frozen snapshot. Likewise, `AlertManager` is constructed with internet, SMS, Bluetooth and Wi-Fi Direct transports, but the current service's incident path does not dispatch through it. The active emergency dispatch path is `ResponseManager` -> SMS and call transports. The internet transport needs a configured endpoint; Bluetooth and Wi-Fi Direct transports are placeholders.
 
----
+## Repository map
 
-## Package Structure
+| Area | Contents |
+| --- | --- |
+| `app/src/main/java/com/zerotap/service` | Foreground service, dependency wiring, periodic sensor evaluation and service state flows |
+| `sensor` | Sensor interfaces/sources, location analysis, motion feature extraction |
+| `ai` | Development heuristic engines, hierarchical inference coordinator, summarizer interfaces and future stubs |
+| `domain/risk` | Legacy signal scorer, newer feature-based risk predictor, temporal tracker |
+| `domain/accident` | Vehicle accident evidence scoring, configuration, accident state machine and models |
+| `domain/incident`, `domain/response` | Legacy incident lifecycle and active SMS/call response orchestration |
+| `evidence`, `security` | In-memory evidence ring buffer and Keystore-backed encryption implementation |
+| `alert` | Alert transport abstractions, internet/SMS/call transports and mesh placeholders |
+| `data/db`, `data/repository`, `data/datastore` | Room database/DAOs/entities, repositories and preference storage |
+| `data/safety` | Local Chennai safety data loader; JSON asset under `app/src/main/assets` |
+| `ui` | Compose screens, ViewModels, navigation, shared components and theme |
+| `app/src/test` | Unit tests for accident detection/state machine and hierarchical coordination |
 
-```
-com.zerotap
-├── ZeroTapApp.kt                     # Application entry point & ServiceLocator
-├── MainActivity.kt                  # Compose root Activity
-├── ai/
-│   ├── audio/                       # Audio inference interfaces & dev engines
-│   ├── llm/                         # Local summarizer interfaces & dev template
-│   └── motion/                      # Motion classification interfaces & dev engines
-├── alert/
-│   ├── AlertManager.kt              # Transport dispatcher & retry fallback
-│   ├── AlertTransport.kt            # Transport interface
-│   ├── InternetAlertTransport.kt     # HTTP transport
-│   ├── SmsAlertTransport.kt          # SMS transport
-│   └── placeholder/                 # Mesh / Wi-Fi Direct placeholders
-├── data/
-│   ├── datastore/                   # UserPreferences DataStore
-│   ├── db/                          # Room Database, Entities, and DAOs
-│   └── repository/                  # Repositories for incidents, contacts, alerts
-├── domain/
-│   ├── incident/                    # IncidentManager & IncidentStateMachine
-│   ├── model/                       # Domain models, Enums, and RiskSignals
-│   └── risk/                        # RiskEngine interface & DevelopmentRiskEngine
-├── evidence/
-│   ├── EvidenceEncryptionService.kt # Keystore AES-GCM encryption
-│   └── RollingEvidenceBuffer.kt     # Circular pre-incident buffer
-├── security/
-│   └── KeystoreManager.kt           # Hardware-backed Android Keystore wrapper
-├── sensor/
-│   ├── SensorDataSource.kt          # Generic sensor data source interface
-│   ├── audio/                       # Microphone amplitude reader
-│   ├── location/                    # Fused Location reader & Context Analyzer
-│   └── motion/                      # Accelerometer & Gyroscope reader
-├── service/
-│   └── ProtectionForegroundService.kt# Persistent foreground background monitor
-├── ui/
-│   ├── components/                  # Shared Compose components
-│   ├── contacts/                    # Trusted Contacts screen & VM
-│   ├── debug/                       # Developer simulation dashboard & VM
-│   ├── history/                     # Incident history screen & VM
-│   ├── home/                        # Home screen & VM
-│   ├── incident/                    # Active Incident screen & VM
-│   ├── navigation/                  # Navigation graph & routes
-│   ├── protection/                  # Live Protection screen & VM
-│   ├── settings/                    # Settings screen & VM
-│   └── theme/                       # Color, Type, Theme definitions
-└── util/
-    ├── Logger.kt                    # Categorized structured logger
-    └── RollingBuffer.kt             # Generic thread-safe circular buffer
-```
+## Build and run
 
----
-
-## Physical Device Testing Instructions (iQOO / Android)
-
-### Prerequisites
-1. Physical iQOO Android phone.
-2. Enable **Developer Options** (Settings -> About Phone -> Tap *Build Number* 7 times).
-3. In Developer Options, enable **USB Debugging**.
-4. Connect the phone to your PC via USB cable.
-
-### Deploying the Application
-Run the following PowerShell command to verify device connectivity and install:
+Requirements: Android SDK with API 36 installed and a JDK 17-compatible environment. The app module targets SDK 36 and supports Android 10 (API 29) and later. Open the project in Android Studio and allow Gradle sync, or use the Gradle wrapper:
 
 ```powershell
-# 1. Verify ADB sees the phone
-& "C:\Users\Arfat\AppData\Local\Android\Sdk\platform-tools\adb.exe" devices
-
-# 2. Install the compiled debug APK directly
-& "C:\Users\Arfat\AppData\Local\Android\Sdk\platform-tools\adb.exe" install -r "d:\Hackathons\ZeroTap\app\build\outputs\apk\debug\app-debug.apk"
-
-# 3. Launch the application on the phone
-& "C:\Users\Arfat\AppData\Local\Android\Sdk\platform-tools\adb.exe" shell am start -n com.zerotap/.MainActivity
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:testDebugUnitTest
 ```
 
-### Verification Flow on Device
-1. **Launch App**: The Home screen shows `ZERO TAP` in cyan with `Protection: OFF` and risk state `Low`.
-2. **Configure Trusted Contact**: Go to the **Contacts** tab, tap `Add Contact`, and enter a phone number to receive alerts.
-3. **Activate Protection**: Toggle the switch to **ON**. Accept runtime permissions (Location, Microphone, Notifications, SMS). A persistent foreground service notification will appear in the system tray.
-4. **Physical Sensor Check**: Move the phone around or tap the table. Switch to the **Protection** tab to see live motion, audio, and location updates.
-5. **Simulated Trigger**:
-   - Navigate to **Settings** -> **Developer Dashboard**.
-   - Tap **"Distress Audio"** or **"Sudden Motion"** -> notice the Risk Level immediately transition to `Watch` or `Suspicious`.
-   - Tap **"Combined Incident"** -> risk score spikes above `0.70`, transitioning to `INCIDENT`.
-6. **Active Incident Verification**:
-   - The UI displays the red incident screen.
-   - The pre-incident evidence buffer freezes and encrypts via Android Keystore.
-   - An SMS alert attempt is logged and dispatched to your configured contact.
-   - Tap **"Resolve"** or **"Dismiss"** to return to normal state.
-7. **History Verification**: Open the **History** tab to inspect the saved incident report with its generated situation summary.
+Install the generated `app/build/outputs/apk/debug/app-debug.apk` on an emulator or device. Enable the required runtime permissions in the app/device flow for location, microphone, notifications, SMS, and calls as needed. Add a trusted contact before exercising automated responses; use the development dashboard and call simulation setting for controlled demonstrations.
 
----
+## Configuration and important permissions
 
-## Security Considerations
-- **Keystore-Backed AES-GCM**: Encryption keys are generated inside the Android hardware-backed keystore. The master key never leaves secure hardware.
-- **Zero Cloud Audio Streaming**: Audio is analyzed locally using amplitude calculations; raw acoustic audio is never streamed to any remote server.
-- **Privacy Conscious Logging**: Structured logging (`[Sensor]`, `[AI]`, `[Risk]`, `[Incident]`, `[Alert]`) redacts precise raw coordinates and sensitive payloads from Logcat.
+The manifest declares fine/coarse/background location, microphone, foreground service, internet, SMS, call, notification, wake-lock, vibration, and future nearby-device permissions. Android version, device policy, permission grants, battery restrictions and carrier/network availability affect actual operation. The app does not include a backend service. Internet alerts are only meaningful when an endpoint is configured, and the mesh transports are not implemented.
+
+## Current behavior and limitations
+
+- `DevelopmentMotionInferenceEngine`, `DevelopmentAudioInferenceEngine`, `DevelopmentRiskEngine`, and `DevelopmentRiskPredictionEngine` are rule-based prototype implementations. The `FutureOnDevice*` classes are integration stubs, not deployed ML models.
+- The newer `DevelopmentRiskPredictionEngine` + `TemporalRiskTracker` + `ResponseManager` path drives the service's timed personal-safety response. The legacy `DevelopmentRiskEngine` + `IncidentManager` path separately updates incident state and history. `IncidentManager` freezes an in-memory evidence snapshot and requests a summary on escalation, but does not invoke `AlertManager`; its constructor currently receives that manager without dispatching through it. The prediction path's score/state is not the same as the legacy `RiskAssessment` state.
+- The freeze operation returns an in-memory snapshot. Although Keystore encryption code exists, it is not connected to the live freeze/incident path. Do not assume evidence is encrypted or retained across process death.
+- `ResponseManager` dispatches direct SMS/call for triggered personal-safety or accident events. `AlertManager`'s internet/SMS/mesh fallback chain is not the active dispatch path. SMS API acceptance is not proof that a recipient received the message; call behavior also depends on permission/device policy and may be simulated.
+- The local incident summarizer is a template implementation. It summarizes the legacy `Incident` model; it is not an LLM.
+- The repository has Android unit tests for selected domain components; those do not validate physical sensor accuracy, background execution across manufacturers, real SMS/call delivery, or emergency outcomes.
+- There is no CI workflow or backend service in the repository. `ARCHITECTURE.md` contains additional design notes; where it conflicts with runtime wiring, this README describes runtime wiring.
+
+## Roadmap notes
+
+`TODO.md` tracks planned on-device motion/audio models, local LLM summaries, off-grid networking, and UI work. Treat those items as planned work unless the implementation and service wiring described above show otherwise.

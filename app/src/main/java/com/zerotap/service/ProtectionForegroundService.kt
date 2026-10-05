@@ -43,6 +43,7 @@ import com.zerotap.domain.risk.TemporalRiskTracker
 import com.zerotap.evidence.RollingEvidenceBuffer
 import com.zerotap.sensor.audio.AudioDataSource
 import com.zerotap.sensor.audio.AudioInferenceEngine
+import com.zerotap.sensor.audio.RobustAudioEngine
 import com.zerotap.sensor.feature.ExtractedMotionFeatures
 import com.zerotap.sensor.feature.StandardSensorFeatureExtractor
 import com.zerotap.sensor.location.LocationAnalysis
@@ -229,11 +230,28 @@ class ProtectionForegroundService : Service() {
 
         // 2. LOCATION INGESTION PIPELINE
         scope.launch {
+            var lastSyncedTime = 0L
             locationDataSource.dataFlow.collect { sample ->
                 locationCount.incrementAndGet()
                 lastLocationSample = sample
                 locationHistoryBuffer.add(sample)
                 evidenceBuffer.addLocation(sample)
+
+                // When in Connected / Server mode, stream live GPS telemetry to responder command center
+                if (com.zerotap.core.config.AppConfiguration.currentMode == com.zerotap.core.config.DeploymentMode.SERVER) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastSyncedTime >= 3000L) {
+                        lastSyncedTime = now
+                        try {
+                            com.zerotap.ServiceLocator.syncRepository.syncCurrentLocation(
+                                latitude = sample.latitude,
+                                longitude = sample.longitude,
+                                speed = sample.speed,
+                                bearing = sample.bearing
+                            )
+                        } catch (_: Exception) {}
+                    }
+                }
             }
         }
 
@@ -253,6 +271,27 @@ class ProtectionForegroundService : Service() {
             while (isActive) {
                 delay(1000)
                 evaluateSensorPipelines()
+            }
+        }
+
+        // 5. EMERGENCY CONTACT SAFETY PING INGESTION (Runs every 2500ms in Connected Mode)
+        scope.launch {
+            var lastHandledPingId: String? = null
+            while (isActive) {
+                delay(2500)
+                if (com.zerotap.core.config.AppConfiguration.currentMode == com.zerotap.core.config.DeploymentMode.SERVER) {
+                    try {
+                        val res = com.zerotap.ServiceLocator.apiClient.checkPendingPing(com.zerotap.core.config.AppConfiguration.deviceId)
+                        res.onSuccess { pending ->
+                            if (pending != null && pending.responseStatus == "PENDING" && pending.pingId != lastHandledPingId) {
+                                lastHandledPingId = pending.pingId
+                                _activeSafetyPing.value = ActiveSafetyPing(pending.pingId, pending.contactName, System.currentTimeMillis())
+                                triggerPingVibration()
+                                notifySafetyCheckPing(pending.pingId, pending.contactName)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -332,28 +371,51 @@ class ProtectionForegroundService : Service() {
         var audioContext: AudioContext? = null
         if (currentAudio != null && currentAudio.isRecording) {
             val audioHistory = audioHistoryBuffer.getSnapshot()
-            val audioPrediction = audioEngine.classify(currentAudio, audioHistory)
-            lastAudioPrediction = audioPrediction
-
-            audioContext = AudioContext(
-                timestamp = now,
-                voiceActivityDetected = currentAudio.amplitudeDb > 55f,
-                elevatedVocalEnergy = currentAudio.amplitudeDb > 70f,
-                distressLikePattern = audioPrediction.classification == AudioClassification.DISTRESS_SOUND,
-                loudImpactDetected = audioPrediction.classification == AudioClassification.LOUD_ACOUSTIC_EVENT,
-                ambientLevelDb = currentAudio.amplitudeDb,
-                classificationLabel = audioPrediction.classification.displayName,
-                confidence = audioPrediction.confidence
+            val ctx = if (audioEngine is RobustAudioEngine) {
+                audioEngine.analyzeToContext(currentAudio, audioHistory)
+            } else if (audioEngine is DevelopmentAudioInferenceEngine) {
+                audioEngine.analyzeToContext(currentAudio, audioHistory)
+            } else {
+                val pred = audioEngine.classify(currentAudio, audioHistory)
+                AudioContext(
+                    timestamp = now,
+                    detectedClass = pred.classification,
+                    confidence = pred.confidence,
+                    anomalyScore = if (pred.classification == AudioClassification.DISTRESS_SOUND) 0.65f else 0.1f,
+                    ambientLevelDb = currentAudio.amplitudeDb,
+                    classificationLabel = pred.classification.displayName
+                )
+            }
+            audioContext = ctx
+            lastAudioPrediction = AudioPrediction(
+                classification = ctx.detectedClass,
+                confidence = ctx.confidence,
+                timestamp = ctx.timestamp
             )
 
-            if (audioPrediction.classification != AudioClassification.NORMAL) {
+            // Emit AudioSignal only for genuine acoustic anomalies (not normal traffic, speech, or steady background)
+            if (ctx.detectedClass != AudioClassification.NORMAL &&
+                ctx.detectedClass != AudioClassification.TRAFFIC &&
+                ctx.detectedClass != AudioClassification.SPEECH &&
+                ctx.detectedClass != AudioClassification.SILENCE &&
+                ctx.anomalyScore >= 0.20f
+            ) {
+                val signalWeight = when (ctx.detectedClass) {
+                    AudioClassification.DISTRESS_SOUND -> (0.35f * ctx.anomalyScore).coerceIn(0.20f, 0.40f)
+                    AudioClassification.LOUD_ACOUSTIC_EVENT -> (0.30f * ctx.anomalyScore).coerceIn(0.15f, 0.35f)
+                    AudioClassification.SHOUTING -> (0.25f * ctx.anomalyScore).coerceIn(0.10f, 0.28f)
+                    AudioClassification.LOUD_NOISE -> (0.15f * ctx.anomalyScore).coerceIn(0.05f, 0.18f)
+                    else -> 0.05f
+                }
                 signals.add(
                     RiskSignal.AudioSignal(
                         timestamp = now,
-                        weight = if (audioPrediction.classification == AudioClassification.DISTRESS_SOUND) 0.40f else 0.20f,
-                        description = "Audio: ${audioPrediction.classification.displayName} (%.1f dB)".format(currentAudio.amplitudeDb),
-                        classification = audioPrediction.classification,
-                        confidence = audioPrediction.confidence
+                        weight = signalWeight,
+                        description = "Audio: ${ctx.detectedClass.displayName} (%.1f dB, dev: %.1f dB, anom: %.2f)".format(
+                            ctx.ambientLevelDb, ctx.ambientLevelDb - ctx.baselineDb, ctx.anomalyScore
+                        ),
+                        classification = ctx.detectedClass,
+                        confidence = ctx.confidence
                     )
                 )
             }
@@ -568,6 +630,7 @@ class ProtectionForegroundService : Service() {
                     locationLongitude = lSample?.longitude,
                     locationAccuracy = lSample?.accuracy,
                     locationSpeed = lSample?.speed,
+                    locationBearing = if (lSample != null && lSample.bearing != 0f) lSample.bearing else null,
 
                     audioAmplitudeDb = aMeta?.amplitudeDb ?: 0f,
                     isAudioRecording = aMeta?.isRecording ?: false,
@@ -606,6 +669,14 @@ class ProtectionForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESPOND_PING_SAFE) {
+            val pingId = intent.getStringExtra(EXTRA_PING_ID) ?: ""
+            acknowledgeActivePingSafe(pingId)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(SAFETY_PING_NOTIFICATION_ID)
+            return START_NOT_STICKY
+        }
+
         val notification = buildForegroundNotification()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -669,8 +740,52 @@ class ProtectionForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun triggerPingVibration() {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300), -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 300, 200, 300), -1)
+        }
+    }
+
+    private fun notifySafetyCheckPing(pingId: String, contactName: String) {
+        val intentOk = Intent(this, ProtectionForegroundService::class.java).apply {
+            action = ACTION_RESPOND_PING_SAFE
+            putExtra(EXTRA_PING_ID, pingId)
+        }
+        val pendingOk = PendingIntent.getService(
+            this,
+            pingId.hashCode(),
+            intentOk,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notification = NotificationCompat.Builder(this, SAFETY_PING_CHANNEL_ID)
+            .setContentTitle("Safety Check: $contactName")
+            .setContentText("Emergency contact checking on you. Tap if you're safe.")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .addAction(android.R.drawable.checkbox_on_background, "I'M OK", pendingOk)
+            .build()
+
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(SAFETY_PING_NOTIFICATION_ID, notification)
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+
             val channel = NotificationChannel(
                 PROTECTION_CHANNEL_ID,
                 "ZeroTap Protection Service",
@@ -678,14 +793,50 @@ class ProtectionForegroundService : Service() {
             ).apply {
                 description = "Shows persistent status while sensor protection is active"
             }
-            val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
+
+            val pingChannel = NotificationChannel(
+                SAFETY_PING_CHANNEL_ID,
+                "ZeroTap Emergency Safety Pings",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Urgent alerts when emergency contacts check on your safety"
+                enableVibration(true)
+            }
+            manager.createNotificationChannel(pingChannel)
         }
     }
 
+    data class ActiveSafetyPing(
+        val pingId: String,
+        val contactName: String,
+        val timestamp: Long
+    )
+
     companion object {
-        private const val PROTECTION_CHANNEL_ID = "zerotap_protection_channel"
-        private const val NOTIFICATION_ID = 1001
+        const val PROTECTION_CHANNEL_ID = "zerotap_protection_channel"
+        const val SAFETY_PING_CHANNEL_ID = "zerotap_safety_ping_channel"
+        const val NOTIFICATION_ID = 1001
+        const val SAFETY_PING_NOTIFICATION_ID = 2002
+        const val ACTION_RESPOND_PING_SAFE = "com.zerotap.action.RESPOND_PING_SAFE"
+        const val EXTRA_PING_ID = "extra_ping_id"
+
+        private val _activeSafetyPing = MutableStateFlow<ActiveSafetyPing?>(null)
+        val activeSafetyPing: StateFlow<ActiveSafetyPing?> = _activeSafetyPing.asStateFlow()
+
+        fun acknowledgeActivePingSafe(pingId: String? = null) {
+            val id = pingId ?: _activeSafetyPing.value?.pingId ?: return
+            _activeSafetyPing.value = null
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    com.zerotap.ServiceLocator.apiClient.respondToContactPing(
+                        pingId = id,
+                        userId = com.zerotap.core.config.AppConfiguration.deviceId,
+                        message = "I'm OK"
+                    )
+                } catch (_: Exception) {}
+            }
+        }
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()

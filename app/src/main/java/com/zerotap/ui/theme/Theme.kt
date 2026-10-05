@@ -44,12 +44,12 @@ private val LightColorScheme = lightColorScheme(
 private val DarkColorScheme = darkColorScheme(
     primary = ZtDarkPrimaryAccent,
     onPrimary = ZtDarkBackground,
-    primaryContainer = Color(0xFF332520),
+    primaryContainer = Color(0xFF2E2320),
     onPrimaryContainer = ZtDarkPrimaryText,
 
     secondary = ZtDarkSecondaryAccent,
     onSecondary = ZtDarkBackground,
-    secondaryContainer = Color(0xFF242C27),
+    secondaryContainer = Color(0xFF1E2824),
     onSecondaryContainer = ZtDarkPrimaryText,
 
     background = ZtDarkBackground,
@@ -57,11 +57,11 @@ private val DarkColorScheme = darkColorScheme(
 
     surface = ZtDarkSurface,
     onSurface = ZtDarkPrimaryText,
-    surfaceVariant = Color(0xFF2A2522),
+    surfaceVariant = Color(0xFF22262C),
     onSurfaceVariant = ZtDarkSecondaryText,
 
     outline = ZtDarkDivider,
-    outlineVariant = Color(0xFF3D3633),
+    outlineVariant = Color(0xFF2A2E35),
 
     error = ZtHighRiskRust,
     onError = Color.White

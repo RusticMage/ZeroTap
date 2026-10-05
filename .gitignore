@@ -1,13 +1,18 @@
-<<<<<<< HEAD
 # Gradle files
 .gradle/
 build/
+/app/build/
+
+# Maven files
+target/
+zerotap-server/target/
 
 # Local configuration file (sdk path, etc)
 local.properties
 
 # Log/OS Files
 *.log
+.DS_Store
 
 # Android Studio generated files and folders
 captures/
@@ -17,7 +22,7 @@ captures/
 *.apk
 output-metadata.json
 
-# IntelliJ
+# IntelliJ / IDE
 *.iml
 .idea/
 misc.xml
@@ -33,16 +38,15 @@ google-services.json
 
 # Android Profiling
 *.hprof
-=======
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-/app/build
->>>>>>> dfb1caf (Version 1 of ZeroTap)
+
+# Python
+__pycache__/
+*.pyc
+
+# Scratch / test files
+crop_6517A.jpg
+detail_7_A.jpg
+detect_plate.py
+plate_zoomed.jpg
+test_screen_crop.jpg
+zerotap-server.zip

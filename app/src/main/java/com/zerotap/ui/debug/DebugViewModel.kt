@@ -69,13 +69,17 @@ class DebugViewModel : ViewModel() {
         val now = System.currentTimeMillis()
         syntheticAudio = AudioContext(
             timestamp = now,
+            detectedClass = AudioClassification.DISTRESS_SOUND,
+            confidence = 0.92f,
+            anomalyScore = 0.82f,
+            ambientLevelDb = 82.5f,
+            baselineDb = 45.0f,
+            isBaselineWarmedUp = true,
             voiceActivityDetected = true,
             elevatedVocalEnergy = true,
             distressLikePattern = true,
             loudImpactDetected = false,
-            ambientLevelDb = 82.5f,
-            classificationLabel = "Distress Sound",
-            confidence = 0.92f
+            classificationLabel = "Distress Sound"
         )
         _lastInjectedSignalName.value = "Distress Acoustic Pattern (+Voice Risk)"
         recalculateSyntheticRisk()
@@ -116,13 +120,17 @@ class DebugViewModel : ViewModel() {
         )
         syntheticAudio = AudioContext(
             timestamp = now,
+            detectedClass = AudioClassification.DISTRESS_SOUND,
+            confidence = 0.95f,
+            anomalyScore = 0.90f,
+            ambientLevelDb = 89.0f,
+            baselineDb = 45.0f,
+            isBaselineWarmedUp = true,
             voiceActivityDetected = true,
             elevatedVocalEnergy = true,
             distressLikePattern = true,
             loudImpactDetected = true,
-            ambientLevelDb = 89.0f,
-            classificationLabel = "Distress Sound + High Decibel Spike",
-            confidence = 0.95f
+            classificationLabel = "Distress Sound + High Decibel Spike"
         )
         syntheticLocation = LocationContext(
             timestamp = now,

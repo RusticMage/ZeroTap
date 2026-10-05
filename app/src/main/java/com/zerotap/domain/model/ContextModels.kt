@@ -27,16 +27,22 @@ data class MotionContext(
  */
 data class AudioContext(
     val timestamp: Long,
+    val detectedClass: AudioClassification = AudioClassification.NORMAL,
+    val confidence: Float = 0.5f,
+    val anomalyScore: Float = 0f,
+    val ambientLevelDb: Float = 0f,
+    val baselineDb: Float = 0f,
+    val isBaselineWarmedUp: Boolean = false,
+    val modelAvailable: Boolean = true,
     val voiceActivityDetected: Boolean = false,
     val elevatedVocalEnergy: Boolean = false,
     val distressLikePattern: Boolean = false,
     val loudImpactDetected: Boolean = false,
-    val ambientLevelDb: Float = 0f,
-    val classificationLabel: String = "Normal",
-    val confidence: Float = 0.5f
+    val classificationLabel: String = "Normal"
 ) {
+    val ambientLevel: Float get() = ambientLevelDb
     val isElevatedAcoustic: Boolean
-        get() = distressLikePattern || loudImpactDetected || (elevatedVocalEnergy && ambientLevelDb > 75f)
+        get() = distressLikePattern || loudImpactDetected || anomalyScore > 0.40f || (elevatedVocalEnergy && ambientLevelDb > 75f)
 }
 
 /**

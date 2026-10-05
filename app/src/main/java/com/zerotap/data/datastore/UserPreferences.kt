@@ -28,6 +28,9 @@ class UserPreferences(private val context: Context) {
         val HOME_LATITUDE = stringPreferencesKey("home_latitude")
         val HOME_LONGITUDE = stringPreferencesKey("home_longitude")
         val HOME_LABEL = stringPreferencesKey("home_label")
+        val DEPLOYMENT_MODE = stringPreferencesKey("deployment_mode") // "PRIVATE", "SERVER"
+        val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        val SELECTED_AI_PROVIDER = stringPreferencesKey("selected_ai_provider")
     }
 
     val protectionEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -146,4 +149,38 @@ class UserPreferences(private val context: Context) {
             preferences.remove(PreferencesKeys.HOME_LABEL)
         }
     }
+
+    val deploymentMode: Flow<com.zerotap.core.config.DeploymentMode> = context.dataStore.data.map { preferences ->
+        when (preferences[PreferencesKeys.DEPLOYMENT_MODE]) {
+            "SERVER" -> com.zerotap.core.config.DeploymentMode.SERVER
+            else -> com.zerotap.core.config.DeploymentMode.PRIVATE
+        }
+    }
+
+    suspend fun setDeploymentMode(mode: com.zerotap.core.config.DeploymentMode) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEPLOYMENT_MODE] = mode.name
+        }
+    }
+
+    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ONBOARDING_COMPLETED] ?: false
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
+        }
+    }
+
+    val selectedAiProvider: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.SELECTED_AI_PROVIDER] ?: "LOCAL"
+    }
+
+    suspend fun setSelectedAiProvider(providerName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SELECTED_AI_PROVIDER] = providerName
+        }
+    }
 }
+

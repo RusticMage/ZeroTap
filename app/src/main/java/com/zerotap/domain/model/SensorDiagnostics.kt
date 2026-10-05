@@ -21,6 +21,7 @@ data class SensorDiagnostics(
     val locationLongitude: Double? = null,
     val locationAccuracy: Float? = null,
     val locationSpeed: Float? = null,
+    val locationBearing: Float? = null,
     
     val audioAmplitudeDb: Float = 0f,
     val isAudioRecording: Boolean = false,

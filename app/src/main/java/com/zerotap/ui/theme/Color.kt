@@ -6,14 +6,14 @@ import androidx.compose.ui.graphics.Color
 // ZERO TAP - Hospitable Color System (Day 2 Final Specification)
 // ========================================================================
 
-// Exact User Dark Mode Hex Palette
-val ZtDarkBackground = Color(0xFF161412)       // #161412 Dark Background
-val ZtDarkSurface = Color(0xFF211D1A)          // #211D1A Dark Surface Card
-val ZtDarkPrimaryText = Color(0xFFF5EBE6)      // #F5EBE6 Primary Text
-val ZtDarkSecondaryText = Color(0xFFB8A8A0)    // #B8A8A0 Secondary Text
-val ZtDarkPrimaryAccent = Color(0xFFD4836B)    // #D4836B Terracotta Accent
-val ZtDarkSecondaryAccent = Color(0xFF8FA89B)  // #8FA89B Muted Sage Accent
-val ZtDarkDivider = Color(0xFF362F2D)          // #362F2D Dividers & Borders
+// Exact Charcoal Dark Mode Hex Palette (Sleek Modern Charcoal)
+val ZtDarkBackground = Color(0xFF121417)       // Deep Charcoal Slate Background
+val ZtDarkSurface = Color(0xFF1A1D21)          // Sleek Elevated Charcoal Card
+val ZtDarkPrimaryText = Color(0xFFF1F3F5)      // Crisp Bright Primary Text
+val ZtDarkSecondaryText = Color(0xFFA6ADBA)    // Clean Cool Secondary Text
+val ZtDarkPrimaryAccent = Color(0xFFE27B55)    // Refined Terracotta Coral Accent
+val ZtDarkSecondaryAccent = Color(0xFF86A596)  // Grounded Sage Accent
+val ZtDarkDivider = Color(0xFF262A30)          // Charcoal Outline & Dividers
 
 // Light Mode Warm Ivory / Hospitable Canvas
 val ZtWarmIvory = Color(0xFFFBF9F5)            // Soft Hospitable Cream Background

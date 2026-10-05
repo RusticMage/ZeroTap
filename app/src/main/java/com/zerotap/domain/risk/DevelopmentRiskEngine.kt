@@ -18,10 +18,13 @@ class DevelopmentRiskEngine : RiskEngine {
             when (signal) {
                 is RiskSignal.AudioSignal -> {
                     when (signal.classification) {
-                        AudioClassification.DISTRESS_SOUND -> score += 0.40f * signal.confidence
-                        AudioClassification.LOUD_NOISE -> score += 0.15f * signal.confidence
-                        AudioClassification.LOUD_ACOUSTIC_EVENT -> score += 0.30f * signal.confidence
-                        AudioClassification.SILENCE -> score += 0.02f
+                        AudioClassification.DISTRESS_SOUND -> score += (0.35f * signal.confidence).coerceAtMost(0.35f)
+                        AudioClassification.LOUD_ACOUSTIC_EVENT -> score += (0.28f * signal.confidence).coerceAtMost(0.30f)
+                        AudioClassification.SHOUTING -> score += (0.20f * signal.confidence).coerceAtMost(0.22f)
+                        AudioClassification.LOUD_NOISE -> score += (0.12f * signal.confidence).coerceAtMost(0.15f)
+                        AudioClassification.SILENCE -> score += 0.01f
+                        AudioClassification.TRAFFIC -> {}
+                        AudioClassification.SPEECH -> {}
                         else -> {}
                     }
                 }
@@ -49,6 +52,9 @@ class DevelopmentRiskEngine : RiskEngine {
                 }
                 is RiskSignal.RouteSignal -> {
                     score += 0.15f
+                }
+                is RiskSignal.TrustedPlaceProximitySignal -> {
+                    // Contextual hint only: does not suppress danger signals
                 }
             }
         }

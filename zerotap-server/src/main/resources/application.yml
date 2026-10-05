@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: zerotap-server
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:zerotapdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+zerotap:
+  jwt:
+    secret: ${JWT_SECRET:zerotap_super_secret_jwt_key_with_at_least_256_bits_length_for_hmac_sha256}
+    expiration-ms: 86400000 # 24 hours
+  vertex:
+    project-id: ${VERTEX_PROJECT_ID:zerotap-safety-prod}
+    location: ${VERTEX_LOCATION:us-central1}
+    model-id: ${VERTEX_MODEL_ID:gemma-4-safety}
+    api-endpoint: ${VERTEX_API_ENDPOINT:https://us-central1-aiplatform.googleapis.com}

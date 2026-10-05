@@ -44,22 +44,30 @@ class DevelopmentRiskPredictionEngine : RiskPredictionEngine {
             }
         }
 
-        // 2. EVALUATE AUDIO CONTEXT
+        // 2. EVALUATE AUDIO CONTEXT (Dynamic Acoustic Baseline & Anomaly Driven)
         val audio = context.audio
-        if (audio != null) {
-            if (audio.distressLikePattern) {
-                rawAudioScore += 0.45f * audio.confidence
-                factors.add("Distress Vocal Pattern (%.1f dB)".format(audio.ambientLevelDb))
-            } else if (audio.loudImpactDetected) {
-                rawAudioScore += 0.35f * audio.confidence
-                factors.add("Acoustic Impact / Sharp Spike (%.1f dB)".format(audio.ambientLevelDb))
-            } else if (audio.elevatedVocalEnergy && audio.ambientLevelDb > 70f) {
-                rawAudioScore += 0.20f * (audio.ambientLevelDb / 100f).coerceIn(0.1f, 0.4f)
-                factors.add("Elevated Vocal Activity (%.1f dB)".format(audio.ambientLevelDb))
-            } else if (audio.ambientLevelDb > 85f) {
-                rawAudioScore += 0.15f
-                factors.add("Loud Ambient Noise (%.1f dB)".format(audio.ambientLevelDb))
+        if (audio != null && audio.modelAvailable) {
+            val deviation = (audio.ambientLevelDb - audio.baselineDb).coerceAtLeast(0f)
+
+            if (audio.distressLikePattern && audio.anomalyScore >= 0.35f) {
+                // Persistent vocal distress well above baseline
+                rawAudioScore += (0.35f * audio.anomalyScore * audio.confidence).coerceIn(0.15f, 0.35f)
+                factors.add("Acoustic Vocal Distress Pattern (%.1f dB, dev +%.1f dB)".format(audio.ambientLevelDb, deviation))
+            } else if (audio.loudImpactDetected && audio.anomalyScore >= 0.30f) {
+                // Sharp acoustic impact spike
+                rawAudioScore += (0.28f * audio.anomalyScore * audio.confidence).coerceIn(0.12f, 0.28f)
+                factors.add("Acoustic Impact / Sharp Spike (%.1f dB, dev +%.1f dB)".format(audio.ambientLevelDb, deviation))
+            } else if (audio.elevatedVocalEnergy && audio.anomalyScore >= 0.25f) {
+                // Elevated shouting / vocal energy deviating from baseline
+                rawAudioScore += (0.20f * audio.anomalyScore).coerceIn(0.08f, 0.20f)
+                factors.add("Elevated Shouting / Vocal Activity (%.1f dB, dev +%.1f dB)".format(audio.ambientLevelDb, deviation))
+            } else if (audio.anomalyScore >= 0.35f) {
+                // Significant acoustic anomaly relative to current baseline
+                rawAudioScore += (0.15f * audio.anomalyScore).coerceIn(0.05f, 0.15f)
+                factors.add("Acoustic Baseline Anomaly (%.1f dB vs baseline %.1f dB)".format(audio.ambientLevelDb, audio.baselineDb))
             }
+            // Note: Steady ambient noise (traffic, campus crowd, inside bus/train) matches baseline,
+            // producing anomalyScore < 0.20, contributing 0 to rawAudioScore.
         }
 
         // 3. EVALUATE LOCATION CONTEXT (Kinematics & Movement Continuity)
