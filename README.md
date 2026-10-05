@@ -1,117 +1,161 @@
-# ZeroTap
+# ZeroTap 🛡️
 
-ZeroTap is an Android personal-safety prototype. While protection is running, a foreground service collects motion, location and microphone-level metadata, evaluates risk locally, and can prompt or escalate a suspected vehicle accident. The project contains two related risk/incident paths; this README documents the code that is currently wired and calls out unfinished or disconnected parts.
+**ZeroTap** is an autonomous, multimodal personal safety and incident intelligence platform. Built with an **offline-first edge architecture**, ZeroTap continuously monitors physical motion kinematics, acoustic environments, and geospatial context on-device. When danger or a vehicle accident is detected, it executes an autonomous escalation protocol while streaming real-time telemetry to a paired **Emergency Contact Web Command Center**.
 
-> **Project status:** prototype / development implementation. Motion and audio classifiers and risk scoring are deterministic heuristics, not trained models. Review the [current behavior and limitations](#current-behavior-and-limitations) before treating this as an emergency-response product.
+---
 
-## Architecture and end-to-end flows
+## 🌟 Key Capabilities
+
+### 1. 100% Offline-First Edge Risk Engine
+* **Multimodal Kinematics & Motion**: Real-time 3-axis accelerometer and gyroscope analysis detecting abrupt freefall, violent deceleration drops (>24 m/s²), severe rotational jerk, and sustained post-impact stillness.
+* **Vehicle Accident State Machine**: Autonomous 4-stage vehicle crash detection with a 15-second grace period, spoken prompts, and haptic warnings before automated emergency dispatch.
+* **Adaptive Acoustic Baseline**: `AudioBaselineTracker` continuously models ambient decibel baselines (quiet, crowd, traffic, transit), detecting significant vocal/distress spikes while avoiding false positives from loud city environments.
+* **Autonomous Fallback Navigation**: Direct mathematical evacuation course calculation (azimuth bearing, Haversine distance, and interpolated waypoints) to the nearest safe space (police station, hospital, 24/7 pharmacy) even with zero internet connectivity.
+
+### 2. Emergency Contact & Web Command Center Link
+* **Secure 1:1 Pairing**: Generates single-use, cryptographically secure 6-digit pairing codes that connect an Android device to an emergency contact's web dashboard.
+* **Multi-Host Resilience**: Seamless auto-discovery across USB reverse tethering (`127.0.0.1:8080`), local Wi-Fi LAN, and standalone offline mode.
+* **Live Telemetry & Status**: Streams GPS coordinates, risk level, battery health, and online/stale/offline indicators to the web dashboard.
+* **Bidirectional "Are You OK?" Pings**: Emergency contacts can trigger a safety ping from the web dashboard. The phone sounds an urgent alert with an immediate `[I'M OK]` notification response that updates the command center in real time.
+
+### 3. Vehicle Plate Vision & Evidence Capture
+* **Integrated OCR Pipeline**: Roboflow bounding box plate localization + PaddleOCR character recognition + Indian license plate format validation (`AA 00 AA 0000`).
+* **Evidence Management**: Captures location-stamped evidence items linked to incidents.
+
+### 4. Dual Deployment Modes
+* **Private Mode (Default)**: Complete local privacy. All risk scoring, audio classification, and safe space routing run strictly on-device with optional Bring-Your-Own-Key (BYOK) incident summaries.
+* **Server Mode**: Connects to the ZeroTap Spring Boot backend for real-time remote monitoring, emergency contact pairing, and command center telemetry.
+
+---
+
+## 🏗️ Architecture Overview
 
 ```mermaid
 flowchart TB
-  subgraph Android[Android app]
-    UI[Compose UI / ViewModels] -->|start, stop, controls| SVC[ProtectionForegroundService]
-    SVC --> M[MotionDataSource<br/>accelerometer + gyroscope]
-    SVC --> L[LocationDataSource<br/>fused location]
-    SVC --> A[AudioDataSource<br/>PCM to amplitude metadata]
-    M -->|MotionSample| RB[Rolling windows + evidence buffer]
-    L -->|LocationSample| RB
-    A -->|AudioMetadata; raw samples discarded| RB
-    M --> W[1-second evaluation loop]
-    L --> W
-    A --> W
-    W --> Q{Quiescent and risk normal?}
-    Q -->|yes| IDLE[Tier 0: skip this evaluation]
-    Q -->|no| FE[Feature extraction + heuristic motion/audio classification]
-    FE --> RP[DevelopmentRiskPredictionEngine<br/>multimodal feature score]
-    RP --> TT[TemporalRiskTracker<br/>risk state + emergency countdown]
-    TT --> RM[ResponseManager]
-    RM -->|emergency triggered| CONTACTS[Room trusted contacts]
-    CONTACTS --> SMS[SMS dispatch]
-    SMS --> CALL[Call initiation attempt]
-    FE --> VD[VehicleAccidentDetector]
-    VD --> AS[VehicleAccidentStateMachine]
-    AS -->|possible accident| PROMPT[Vibration + spoken prompt + grace countdown]
-    PROMPT -->|user affirms fine| CANCEL[Cancel escalation]
-    PROMPT -->|timeout| RM
-    W --> LEGACY[Legacy RiskEngine / IncidentManager path]
-    RB --> SNAP[In-memory EvidenceSnapshot on freeze]
-    UI <-->|StateFlows / controls| SVC
-    UI --> DB[(Room: incidents, contacts, risk events,<br/>evidence metadata, alert attempts)]
-    SVC --> DB
-    PREF[DataStore preferences] <--> UI
-    PREF <--> SVC
+  subgraph Phone["Android Edge Device (ZeroTap App)"]
+    Sensors["Sensors: Accel + Gyro + GPS + Mic"] --> Ingestion["Sensor Data Sources & Ingestion"]
+    Ingestion --> RingBuffer["Evidence Ring Buffer (Motion, GPS, Audio Meta)"]
+    Ingestion --> Loop["1-Second Evaluation Loop"]
+    
+    Loop --> AudioBase["Audio Baseline Tracker<br/>(Ambient vs Anomaly dB)"]
+    Loop --> MotionFE["Motion Feature Extraction<br/>(Jerk, Freefall, Impact)"]
+    Loop --> CrashSM["Vehicle Accident<br/>State Machine"]
+    
+    AudioBase --> RiskPred["Multimodal Risk Engine (0-100)"]
+    MotionFE --> RiskPred
+    
+    RiskPred --> TempTracker["Temporal Risk Tracker"]
+    TempTracker --> Escalation["Response Manager"]
+    CrashSM --> Escalation
+    
+    Escalation --> DirectResp["Direct Escalation: SMS + Call"]
+    Escalation --> NavEngine["Offline Evacuation Router"]
+    
+    NavEngine --> SafeSpaces[("Local Safe Spaces DB<br/>(Police, Hospitals, Pharmacies)")]
   end
-  INTERNET[InternetAlertTransport] -. configured in legacy path;<br/>no current incident trigger .-> LEGACY
-  MESH[Bluetooth / Wi-Fi Direct placeholders] -. unavailable stubs .-> LEGACY
+
+  subgraph Cloud["ZeroTap Backend & Command Center"]
+    Server["Spring Boot Backend (:8080)<br/>REST APIs + STOMP WebSockets"]
+    WebUI["Web Command Center (:8080)<br/>Leaflet Map + Telemetry + Ping Hub"]
+    Server <--> WebUI
+  end
+
+  Phone <-->|Secure 6-Digit Pairing & Telemetry| Server
 ```
 
-### 1. App startup and protection lifecycle
+---
 
-`MainActivity` applies the Compose theme and creates the navigation graph. Screens and ViewModels expose settings, contacts, history, protection telemetry, incident controls, maps, and a developer dashboard. The protection flow starts `ProtectionForegroundService`, which constructs sensor sources, Room repositories, preferences, risk components, and response handlers. It starts motion, location, and audio collection and publishes service state through `StateFlow`s. The manifest declares the foreground service as location and microphone typed.
+## 📂 Repository Structure
 
-### 2. Sensor ingestion and rolling context
+```
+ZeroTap/
+├── app/                                # Android Application (Jetpack Compose, Kotlin)
+│   ├── src/main/java/com/zerotap/
+│   │   ├── ai/                         # Audio inference, BYOK, local heuristic models
+│   │   ├── alert/                      # SMS, Call, and Internet alert transports
+│   │   ├── core/config/                # Centralized AppConfiguration & deployment modes
+│   │   ├── data/                       # Room database, repositories, API clients, DataStore
+│   │   ├── domain/                     # Risk engine, accident state machine, models
+│   │   ├── sensor/                     # Audio baseline tracker, motion & location sources
+│   │   ├── service/                    # ProtectionForegroundService & safety ping loop
+│   │   └── ui/                         # Compose screens (Home, Map, Contacts, Settings, Plate OCR)
+│   └── src/main/assets/                # Pre-cached Safe Spaces dataset (Chennai & Tamil Nadu)
+├── zerotap-server/                     # Spring Boot 3.3.4 Backend & Web Command Center
+│   ├── src/main/java/com/zerotap/      # Controllers, pairing service, WebSocket publishers
+│   └── src/main/resources/static/      # Web Command Center UI (HTML, CSS, Vanilla JS, Leaflet)
+├── vehicle_plate_ai/                   # Python Vehicle Plate OCR Pipeline
+│   ├── detector/                       # Roboflow plate detector
+│   ├── ocr/                            # PaddleOCR character recognition
+│   └── validation/                     # Indian license plate format validation
+└── ARCHITECTURE.md                     # In-depth architectural design specification
+```
 
-- `MotionDataSource` emits accelerometer/gyroscope samples into a short feature window and the evidence ring buffer.
-- `LocationDataSource` emits fused location samples into location history and the evidence ring buffer. `LocationContextAnalyzer` evaluates movement and unexpected stops.
-- `AudioDataSource` reads microphone PCM and emits amplitude metadata; the service keeps metadata, not PCM, in its rolling history/evidence buffer.
-- The evidence buffer is in-memory: 600 motion samples, 12 location samples, and 120 audio metadata records. `freeze()` returns a snapshot of current contents.
+---
 
-### 3. One-second personal-safety risk path
+## 🚀 Getting Started
 
-Every second, the service first checks a cheap quiescence condition. If the phone appears still and quiet while temporal risk and accident state are normal, that evaluation is skipped. Otherwise the service extracts motion features, runs the development motion/audio heuristics, builds `UnifiedSensorContext`, and calls `DevelopmentRiskPredictionEngine`. `TemporalRiskTracker` updates state and countdown, and `ResponseManager` receives each tick. At `EMERGENCY_TRIGGERED`, it deduplicates by event ID, selects the primary (or first available) trusted contact, attempts SMS, then attempts a phone call even if SMS failed. The call transport can run in simulation mode according to preferences.
+### Prerequisites
+* **Android**: Android Studio Jellyfish or newer, Android SDK 36 (min SDK 29), physical Android device or emulator.
+* **Backend**: Java 21 JDK, Apache Maven 3.9+.
 
-The service also converts the same sensor context into `RiskSignal`s for the legacy `DevelopmentRiskEngine` and `IncidentManager` path. These are separate scoring/state flows with different thresholds and semantics; see [Current behavior and limitations](#current-behavior-and-limitations).
+---
 
-### 4. Vehicle-accident path
+### Running the Web Command Center & Backend
 
-The service evaluates extracted motion features and recent location samples with `VehicleAccidentDetector`. Impact/deceleration, jerk, rotation, post-impact stillness and optional GPS speed collapse contribute to heuristic confidence; continued vehicle speed and resumed walking can reduce it. `VehicleAccidentStateMachine` moves through verification and, on sufficient evidence, enters a user-check countdown with vibration, a spoken prompt, and a notification. User confirmation cancels the sequence. Timeout calls `ResponseManager.onAccidentEscalation`, which sends an accident-labeled SMS and attempts a call to the selected contact.
+1. Navigate to the `zerotap-server` directory:
+   ```powershell
+   cd zerotap-server
+   ```
+2. Build and run the server:
+   ```powershell
+   mvn clean spring-boot:run
+   ```
+3. Open your browser at **`http://localhost:8080`** to access the **Web Command Center**.
 
-### 5. Persistence, evidence, and communications
+---
 
-Room stores incidents, trusted contacts, risk events, evidence metadata, and alert attempts through DAOs/repositories. DataStore stores user preferences. A separate `EvidenceEncryptionService` can encrypt a snapshot using an Android Keystore AES-GCM key and write an encrypted file, but the currently wired service/incident path does not call that service or persist the frozen snapshot. Likewise, `AlertManager` is constructed with internet, SMS, Bluetooth and Wi-Fi Direct transports, but the current service's incident path does not dispatch through it. The active emergency dispatch path is `ResponseManager` -> SMS and call transports. The internet transport needs a configured endpoint; Bluetooth and Wi-Fi Direct transports are placeholders.
+### Building and Running the Android App
 
-## Repository map
+1. Connect your Android device via USB with **USB Debugging** enabled.
+2. In the repository root, build and install the debug APK:
+   ```powershell
+   .\gradlew.bat assembleDebug
+   adb install -r app\build\outputs\apk\debug\app-debug.apk
+   ```
+3. To forward the local backend port to your physical phone over USB:
+   ```powershell
+   adb reverse tcp:8080 tcp:8080
+   ```
+4. Launch **ZeroTap** on your phone.
 
-| Area | Contents |
-| --- | --- |
-| `app/src/main/java/com/zerotap/service` | Foreground service, dependency wiring, periodic sensor evaluation and service state flows |
-| `sensor` | Sensor interfaces/sources, location analysis, motion feature extraction |
-| `ai` | Development heuristic engines, hierarchical inference coordinator, summarizer interfaces and future stubs |
-| `domain/risk` | Legacy signal scorer, newer feature-based risk predictor, temporal tracker |
-| `domain/accident` | Vehicle accident evidence scoring, configuration, accident state machine and models |
-| `domain/incident`, `domain/response` | Legacy incident lifecycle and active SMS/call response orchestration |
-| `evidence`, `security` | In-memory evidence ring buffer and Keystore-backed encryption implementation |
-| `alert` | Alert transport abstractions, internet/SMS/call transports and mesh placeholders |
-| `data/db`, `data/repository`, `data/datastore` | Room database/DAOs/entities, repositories and preference storage |
-| `data/safety` | Local Chennai safety data loader; JSON asset under `app/src/main/assets` |
-| `ui` | Compose screens, ViewModels, navigation, shared components and theme |
-| `app/src/test` | Unit tests for accident detection/state machine and hierarchical coordination |
+---
 
-## Build and run
+### Pairing Phone with Web Command Center
 
-Requirements: Android SDK with API 36 installed and a JDK 17-compatible environment. The app module targets SDK 36 and supports Android 10 (API 29) and later. Open the project in Android Studio and allow Gradle sync, or use the Gradle wrapper:
+1. On the phone, navigate to **Settings** $\rightarrow$ **Emergency Contacts**.
+2. Tap **"Generate Pairing Code"**.
+3. A secure 6-digit code (e.g. `482   731`) will be displayed.
+4. On the Web Command Center (`http://localhost:8080`), click **"Connect to ZeroTap User"**, enter the 6-digit code, and submit.
+5. The dashboard will immediately link to your phone, showing live GPS telemetry, connection health, and enabling the **"Send Safety Ping"** feature.
 
+---
+
+### Running Unit Tests
+
+To run the complete test suite across motion kinematics, audio baseline tracking, navigation, and pairing:
 ```powershell
-.\gradlew.bat :app:assembleDebug
-.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat testDebugUnitTest
+```
+To run the Spring Boot integration tests:
+```powershell
+cd zerotap-server
+mvn test
 ```
 
-Install the generated `app/build/outputs/apk/debug/app-debug.apk` on an emulator or device. Enable the required runtime permissions in the app/device flow for location, microphone, notifications, SMS, and calls as needed. Add a trusted contact before exercising automated responses; use the development dashboard and call simulation setting for controlled demonstrations.
+---
 
-## Configuration and important permissions
+## 🔒 Security & Privacy
 
-The manifest declares fine/coarse/background location, microphone, foreground service, internet, SMS, call, notification, wake-lock, vibration, and future nearby-device permissions. Android version, device policy, permission grants, battery restrictions and carrier/network availability affect actual operation. The app does not include a backend service. Internet alerts are only meaningful when an endpoint is configured, and the mesh transports are not implemented.
-
-## Current behavior and limitations
-
-- `DevelopmentMotionInferenceEngine`, `DevelopmentAudioInferenceEngine`, `DevelopmentRiskEngine`, and `DevelopmentRiskPredictionEngine` are rule-based prototype implementations. The `FutureOnDevice*` classes are integration stubs, not deployed ML models.
-- The newer `DevelopmentRiskPredictionEngine` + `TemporalRiskTracker` + `ResponseManager` path drives the service's timed personal-safety response. The legacy `DevelopmentRiskEngine` + `IncidentManager` path separately updates incident state and history. `IncidentManager` freezes an in-memory evidence snapshot and requests a summary on escalation, but does not invoke `AlertManager`; its constructor currently receives that manager without dispatching through it. The prediction path's score/state is not the same as the legacy `RiskAssessment` state.
-- The freeze operation returns an in-memory snapshot. Although Keystore encryption code exists, it is not connected to the live freeze/incident path. Do not assume evidence is encrypted or retained across process death.
-- `ResponseManager` dispatches direct SMS/call for triggered personal-safety or accident events. `AlertManager`'s internet/SMS/mesh fallback chain is not the active dispatch path. SMS API acceptance is not proof that a recipient received the message; call behavior also depends on permission/device policy and may be simulated.
-- The local incident summarizer is a template implementation. It summarizes the legacy `Incident` model; it is not an LLM.
-- The repository has Android unit tests for selected domain components; those do not validate physical sensor accuracy, background execution across manufacturers, real SMS/call delivery, or emergency outcomes.
-- There is no CI workflow or backend service in the repository. `ARCHITECTURE.md` contains additional design notes; where it conflicts with runtime wiring, this README describes runtime wiring.
-
-## Roadmap notes
-
-`TODO.md` tracks planned on-device motion/audio models, local LLM summaries, off-grid networking, and UI work. Treat those items as planned work unless the implementation and service wiring described above show otherwise.
+* **Local Sensor Isolation**: Raw microphone PCM audio is discarded immediately after acoustic feature extraction; raw audio is never written to disk or transmitted to any server.
+* **Encrypted Snapshot Evidence**: The in-memory evidence ring buffer holds only the last 600 motion samples and 120 acoustic metadata points.
+* **Cryptographic Pairing**: Pairing tokens are cryptographically random, expire in 10 minutes, and are single-use. Emergency contacts can only access telemetry from their explicitly paired device.
