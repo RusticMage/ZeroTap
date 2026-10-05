@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Gradle files
 .gradle/
 build/
@@ -33,16 +32,4 @@ google-services.json
 
 # Android Profiling
 *.hprof
-=======
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-/app/build
->>>>>>> dfb1caf (Version 1 of ZeroTap)
+app/src/main/assets/gemini_key.txt

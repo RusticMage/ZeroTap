@@ -52,6 +52,7 @@ import com.zerotap.sensor.motion.MotionDataSource
 import com.zerotap.sensor.motion.MotionInferenceEngine
 import com.zerotap.util.Logger
 import com.zerotap.util.RollingBuffer
+import com.zerotap.ai.baseline.AdaptiveIncidentEngine
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.atomic.AtomicLong
@@ -73,6 +74,8 @@ class ProtectionForegroundService : Service() {
     private val riskEngine: RiskEngine = DevelopmentRiskEngine()
     private val riskPredictionEngine: RiskPredictionEngine = DevelopmentRiskPredictionEngine()
     private val temporalTracker = TemporalRiskTracker()
+    private val adaptive by lazy { AdaptiveIncidentEngine(this) }
+    
 
     // Hierarchical Edge AI and Vehicle Accident components
     private val hierarchicalCoordinator = HierarchicalInferenceCoordinator(featureExtractor, motionEngine, audioEngine, riskPredictionEngine)
@@ -405,12 +408,28 @@ class ProtectionForegroundService : Service() {
             timestamp = now
         )
 
-        val prediction = riskPredictionEngine.evaluate(unifiedContext, temporalTracker.temporalState.value)
-        val newTemporalState = temporalTracker.update(prediction.scorePercent)
-        val finalPrediction = prediction.copy(
-            temporalState = newTemporalState,
-            durationInCurrentStateSeconds = temporalTracker.durationInCurrentStateSeconds
-        )
+val rawPrediction = riskPredictionEngine.evaluate(
+    unifiedContext,
+    temporalTracker.temporalState.value
+)
+
+val prediction = adaptive.process(
+    raw = rawPrediction,
+    features = lastFeatures,
+    audio = lastAudioMetadata,
+    location = lastLocationSample,
+    motion = motionContext,
+    locationContext = locationContext,
+    learn = temporalTracker.temporalState.value == TemporalRiskState.NORMAL,
+    scope = scope
+)
+
+val newTemporalState = temporalTracker.update(prediction.scorePercent)
+
+val finalPrediction = prediction.copy(
+    temporalState = newTemporalState,
+    durationInCurrentStateSeconds = temporalTracker.durationInCurrentStateSeconds
+)
 
         // Tier 2 Event-Triggered Incident Reasoning activation
         if (prediction.scorePercent >= 60 || newTemporalState != TemporalRiskState.NORMAL) {
