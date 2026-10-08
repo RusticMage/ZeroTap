@@ -119,20 +119,18 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                // If in Connected / Server mode, stream live GPS telemetry to responder command center
-                if (com.zerotap.core.config.AppConfiguration.currentMode == com.zerotap.core.config.DeploymentMode.SERVER) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastMapSyncedTime >= 3000L) {
-                        lastMapSyncedTime = now
-                        try {
-                            com.zerotap.ServiceLocator.syncRepository.syncCurrentLocation(
-                                latitude = sample.latitude,
-                                longitude = sample.longitude,
-                                speed = sample.speed,
-                                bearing = sample.bearing
-                            )
-                        } catch (_: Exception) {}
-                    }
+                // Stream live GPS telemetry to responder command center
+                val now = System.currentTimeMillis()
+                if (now - lastMapSyncedTime >= 3000L) {
+                    lastMapSyncedTime = now
+                    try {
+                        com.zerotap.ServiceLocator.syncRepository.syncCurrentLocation(
+                            latitude = sample.latitude,
+                            longitude = sample.longitude,
+                            speed = sample.speed,
+                            bearing = sample.bearing
+                        )
+                    } catch (_: Exception) {}
                 }
             }
         }

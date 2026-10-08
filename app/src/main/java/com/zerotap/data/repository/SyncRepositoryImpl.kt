@@ -217,38 +217,14 @@ class SyncRepositoryImpl(
         speed: Float,
         bearing: Float
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        if (AppConfiguration.currentMode != DeploymentMode.SERVER) {
-            return@withContext Result.success(Unit)
-        }
-
         try {
-            val deviceId = AppConfiguration.deviceId
-            val url = URL("${AppConfiguration.backendBaseUrl}/api/locations?deviceId=$deviceId&userId=$deviceId")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 3000
-                readTimeout = 3000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
-
-            val json = JSONObject().apply {
-                put("latitude", latitude)
-                put("longitude", longitude)
-                put("accuracy", 10.0)
-                put("speed", speed)
-                put("bearing", bearing)
-                put("timestamp", System.currentTimeMillis())
-            }
-
-            conn.outputStream.use { os ->
-                os.write(json.toString().toByteArray(Charsets.UTF_8))
-            }
-
-            if (conn.responseCode in 200..299) {
+            val res = com.zerotap.ServiceLocator.apiClient.syncCurrentLocation(
+                latitude, longitude, speed, bearing
+            )
+            if (res.isSuccess) {
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("HTTP ${conn.responseCode}"))
+                Result.failure(res.exceptionOrNull() ?: Exception("Failed to sync location"))
             }
         } catch (e: Exception) {
             Result.failure(e)

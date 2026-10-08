@@ -7,7 +7,7 @@ package com.zerotap.core.config
 object AppConfiguration {
 
     // --- Deployment & Defaults ---
-    var currentMode: DeploymentMode = DeploymentMode.PRIVATE
+    var currentMode: DeploymentMode = DeploymentMode.SERVER
     var backendBaseUrl: String = try {
         val isEmulator = android.os.Build.FINGERPRINT?.startsWith("generic") == true ||
                 android.os.Build.MODEL?.contains("google_sdk") == true ||

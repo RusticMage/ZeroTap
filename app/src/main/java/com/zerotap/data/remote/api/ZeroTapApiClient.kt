@@ -313,6 +313,42 @@ class ZeroTapApiClient {
             throw Exception("HTTP ${conn.responseCode} from $baseUrl")
         }
     }
+
+    suspend fun syncCurrentLocation(
+        latitude: Double,
+        longitude: Double,
+        speed: Float,
+        bearing: Float
+    ): Result<Boolean> = executeWithCandidates { baseUrl ->
+        val deviceId = AppConfiguration.deviceId
+        val url = URL("$baseUrl/api/locations?deviceId=$deviceId&userId=$deviceId")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 3000
+            readTimeout = 3000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+        }
+
+        val json = JSONObject().apply {
+            put("latitude", latitude)
+            put("longitude", longitude)
+            put("accuracy", 10.0)
+            put("speed", speed)
+            put("bearing", bearing)
+            put("timestamp", System.currentTimeMillis())
+        }
+
+        conn.outputStream.use { os ->
+            os.write(json.toString().toByteArray(Charsets.UTF_8))
+        }
+
+        if (conn.responseCode in 200..299) {
+            true
+        } else {
+            throw Exception("HTTP ${conn.responseCode} from $baseUrl")
+        }
+    }
 }
 
 data class PairingCodeResult(

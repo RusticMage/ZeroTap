@@ -237,20 +237,18 @@ class ProtectionForegroundService : Service() {
                 locationHistoryBuffer.add(sample)
                 evidenceBuffer.addLocation(sample)
 
-                // When in Connected / Server mode, stream live GPS telemetry to responder command center
-                if (com.zerotap.core.config.AppConfiguration.currentMode == com.zerotap.core.config.DeploymentMode.SERVER) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastSyncedTime >= 3000L) {
-                        lastSyncedTime = now
-                        try {
-                            com.zerotap.ServiceLocator.syncRepository.syncCurrentLocation(
-                                latitude = sample.latitude,
-                                longitude = sample.longitude,
-                                speed = sample.speed,
-                                bearing = sample.bearing
-                            )
-                        } catch (_: Exception) {}
-                    }
+                // Stream live GPS telemetry to responder command center / emergency contact
+                val now = System.currentTimeMillis()
+                if (now - lastSyncedTime >= 3000L) {
+                    lastSyncedTime = now
+                    try {
+                        com.zerotap.ServiceLocator.syncRepository.syncCurrentLocation(
+                            latitude = sample.latitude,
+                            longitude = sample.longitude,
+                            speed = sample.speed,
+                            bearing = sample.bearing
+                        )
+                    } catch (_: Exception) {}
                 }
             }
         }
@@ -279,19 +277,17 @@ class ProtectionForegroundService : Service() {
             var lastHandledPingId: String? = null
             while (isActive) {
                 delay(2500)
-                if (com.zerotap.core.config.AppConfiguration.currentMode == com.zerotap.core.config.DeploymentMode.SERVER) {
-                    try {
-                        val res = com.zerotap.ServiceLocator.apiClient.checkPendingPing(com.zerotap.core.config.AppConfiguration.deviceId)
-                        res.onSuccess { pending ->
-                            if (pending != null && pending.responseStatus == "PENDING" && pending.pingId != lastHandledPingId) {
-                                lastHandledPingId = pending.pingId
-                                _activeSafetyPing.value = ActiveSafetyPing(pending.pingId, pending.contactName, System.currentTimeMillis())
-                                triggerPingVibration()
-                                notifySafetyCheckPing(pending.pingId, pending.contactName)
-                            }
+                try {
+                    val res = com.zerotap.ServiceLocator.apiClient.checkPendingPing(com.zerotap.core.config.AppConfiguration.deviceId)
+                    res.onSuccess { pending ->
+                        if (pending != null && pending.responseStatus == "PENDING" && pending.pingId != lastHandledPingId) {
+                            lastHandledPingId = pending.pingId
+                            _activeSafetyPing.value = ActiveSafetyPing(pending.pingId, pending.contactName, System.currentTimeMillis())
+                            triggerPingVibration()
+                            notifySafetyCheckPing(pending.pingId, pending.contactName)
                         }
-                    } catch (_: Exception) {}
-                }
+                    }
+                } catch (_: Exception) {}
             }
         }
     }
