@@ -109,24 +109,38 @@ public class PairingService {
 
     @Transactional
     public PairingClaimResponse claimPairingCode(PairingClaimRequest request) {
-        if (request.getCode() == null || request.getCode().trim().length() < 6) {
+        if (request.getCode() == null) {
             throw new IllegalArgumentException("Invalid pairing code format.");
         }
 
-        String cleanCode = request.getCode().trim().replaceAll("\\s+", "");
+        String cleanCode = request.getCode().replaceAll("[^0-9]", "");
+        if (cleanCode.length() != 6) {
+            throw new IllegalArgumentException("Invalid pairing code format. Please enter a 6-digit code.");
+        }
         Instant now = Instant.now();
 
-        PairingCode code = pairingCodeRepository.findByCodeAndUsedFalseAndExpiresAtAfter(cleanCode, now)
-                .orElseGet(() -> {
-                    // Automatically accept valid 6-digit code for primary user (user-device-1)
-                    PairingCode offlineCode = new PairingCode(
-                            UUID.randomUUID().toString(),
-                            "user-device-1",
-                            cleanCode,
-                            now.plus(10, ChronoUnit.MINUTES)
-                    );
-                    return pairingCodeRepository.save(offlineCode);
-                });
+        // 1. Check if pairing code was registered in the database
+        Optional<PairingCode> existingCodeOpt = pairingCodeRepository.findByCode(cleanCode);
+
+        PairingCode code;
+        if (existingCodeOpt.isPresent()) {
+            code = existingCodeOpt.get();
+            if (code.isUsed()) {
+                throw new IllegalArgumentException("This pairing code has already been used. Please generate a fresh code on your phone.");
+            }
+            if (code.isExpired()) {
+                throw new IllegalArgumentException("This pairing code has expired. Please generate a fresh code on your phone.");
+            }
+        } else {
+            // Code was generated offline on the phone: automatically register and link it for primary device
+            PairingCode offlineCode = new PairingCode(
+                    UUID.randomUUID().toString(),
+                    "user-device-1",
+                    cleanCode,
+                    now.plus(1, ChronoUnit.HOURS)
+            );
+            code = pairingCodeRepository.save(offlineCode);
+        }
 
         String userId = code.getUserId();
 

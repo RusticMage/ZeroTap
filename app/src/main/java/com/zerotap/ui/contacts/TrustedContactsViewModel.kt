@@ -35,6 +35,17 @@ class TrustedContactsViewModel(application: Application) : AndroidViewModel(appl
     private val _errorMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
+    private val _serverUrl = kotlinx.coroutines.flow.MutableStateFlow(
+        com.zerotap.data.remote.api.ZeroTapApiClient.getActiveServerUrl()
+    )
+    val serverUrl: StateFlow<String> = _serverUrl
+
+    fun updateServerUrl(url: String) {
+        com.zerotap.data.remote.api.ZeroTapApiClient.setCustomServerUrl(url)
+        _serverUrl.value = com.zerotap.data.remote.api.ZeroTapApiClient.getActiveServerUrl()
+        refreshPairingStatus()
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }

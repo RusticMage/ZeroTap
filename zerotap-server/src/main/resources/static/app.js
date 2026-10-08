@@ -651,6 +651,19 @@ function openPairingModal() {
   if (errorEl) errorEl.style.display = 'none';
   if (codeInput) {
     codeInput.value = '';
+    codeInput.oninput = (e) => {
+      let digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+      if (digits.length > 3) {
+        e.target.value = digits.slice(0, 3) + ' ' + digits.slice(3);
+      } else {
+        e.target.value = digits;
+      }
+    };
+    codeInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        submitPairingCode();
+      }
+    };
     setTimeout(() => codeInput.focus(), 100);
   }
   if (modal) modal.classList.add('active');
@@ -668,7 +681,7 @@ async function submitPairingCode() {
   const errorEl = document.getElementById('pairing-error-msg');
   const btn = document.getElementById('btn-submit-pairing');
 
-  const rawCode = (codeInput ? codeInput.value : '').trim().replace(/\s+/g, '');
+  const rawCode = (codeInput ? codeInput.value : '').replace(/\D/g, '');
   const contactName = (nameInput ? nameInput.value : '').trim() || 'Emergency Contact';
   const contactPhone = (phoneInput ? phoneInput.value : '').trim() || '';
 

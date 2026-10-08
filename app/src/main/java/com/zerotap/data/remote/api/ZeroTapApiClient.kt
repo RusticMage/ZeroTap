@@ -12,7 +12,7 @@ import java.net.URL
 
 class ZeroTapApiClient {
 
-    private fun getBaseUrl(): String = AppConfiguration.backendBaseUrl
+    private fun getBaseUrl(): String = getActiveServerUrl()
 
     suspend fun registerDevice(deviceId: String, deviceName: String, model: String): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
@@ -141,8 +141,24 @@ class ZeroTapApiClient {
         }
     }
 
-    @Volatile
-    private var activeBaseUrl: String? = null
+    companion object {
+        @Volatile
+        private var activeBaseUrl: String? = null
+
+        fun getActiveServerUrl(): String = activeBaseUrl ?: AppConfiguration.backendBaseUrl
+
+        fun setCustomServerUrl(url: String) {
+            val trimmed = url.trim()
+            if (trimmed.isNotBlank()) {
+                val formatted = if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+                    "http://$trimmed"
+                } else trimmed
+                val clean = formatted.trimEnd('/')
+                AppConfiguration.backendBaseUrl = clean
+                activeBaseUrl = clean
+            }
+        }
+    }
 
     private fun getCandidateBaseUrls(): List<String> {
         val configured = AppConfiguration.backendBaseUrl
@@ -158,6 +174,7 @@ class ZeroTapApiClient {
         val list = mutableListOf<String>()
         activeBaseUrl?.let { list.add(it) }
         list.add(configured)
+        list.add("http://192.168.1.3:8080")
         if (!isEmulator) {
             list.add("http://127.0.0.1:8080")
             list.add("http://172.16.45.4:8080")
@@ -177,6 +194,7 @@ class ZeroTapApiClient {
             try {
                 val res = action(candidate)
                 activeBaseUrl = candidate
+                AppConfiguration.backendBaseUrl = candidate
                 return@withContext Result.success(res)
             } catch (e: Exception) {
                 lastException = e
