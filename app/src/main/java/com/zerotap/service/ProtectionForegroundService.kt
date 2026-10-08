@@ -113,7 +113,7 @@ class ProtectionForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannel(this)
 
         motionDataSource = MotionDataSource(this)
         locationDataSource = LocationDataSource(this)
@@ -283,8 +283,8 @@ class ProtectionForegroundService : Service() {
                         if (pending != null && pending.responseStatus == "PENDING" && pending.pingId != lastHandledPingId) {
                             lastHandledPingId = pending.pingId
                             _activeSafetyPing.value = ActiveSafetyPing(pending.pingId, pending.contactName, System.currentTimeMillis())
-                            triggerPingVibration()
-                            notifySafetyCheckPing(pending.pingId, pending.contactName)
+                            triggerPingVibration(this@ProtectionForegroundService)
+                            notifySafetyCheckPing(this@ProtectionForegroundService, pending.pingId, pending.contactName)
                         }
                     }
                 } catch (_: Exception) {}
@@ -736,73 +736,6 @@ class ProtectionForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun triggerPingVibration() {
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vm?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 200, 300), -1))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(longArrayOf(0, 300, 200, 300), -1)
-        }
-    }
-
-    private fun notifySafetyCheckPing(pingId: String, contactName: String) {
-        val intentOk = Intent(this, ProtectionForegroundService::class.java).apply {
-            action = ACTION_RESPOND_PING_SAFE
-            putExtra(EXTRA_PING_ID, pingId)
-        }
-        val pendingOk = PendingIntent.getService(
-            this,
-            pingId.hashCode(),
-            intentOk,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val notification = NotificationCompat.Builder(this, SAFETY_PING_CHANNEL_ID)
-            .setContentTitle("Safety Check: $contactName")
-            .setContentText("Emergency contact checking on you. Tap if you're safe.")
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setAutoCancel(true)
-            .addAction(android.R.drawable.checkbox_on_background, "I'M OK", pendingOk)
-            .build()
-
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(SAFETY_PING_NOTIFICATION_ID, notification)
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = getSystemService(NotificationManager::class.java)
-
-            val channel = NotificationChannel(
-                PROTECTION_CHANNEL_ID,
-                "ZeroTap Protection Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows persistent status while sensor protection is active"
-            }
-            manager.createNotificationChannel(channel)
-
-            val pingChannel = NotificationChannel(
-                SAFETY_PING_CHANNEL_ID,
-                "ZeroTap Emergency Safety Pings",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Urgent alerts when emergency contacts check on your safety"
-                enableVibration(true)
-            }
-            manager.createNotificationChannel(pingChannel)
-        }
-    }
-
     data class ActiveSafetyPing(
         val pingId: String,
         val contactName: String,
@@ -819,6 +752,82 @@ class ProtectionForegroundService : Service() {
 
         private val _activeSafetyPing = MutableStateFlow<ActiveSafetyPing?>(null)
         val activeSafetyPing: StateFlow<ActiveSafetyPing?> = _activeSafetyPing.asStateFlow()
+
+        fun postSafetyPing(pingId: String, contactName: String) {
+            _activeSafetyPing.value = ActiveSafetyPing(pingId, contactName, System.currentTimeMillis())
+        }
+
+        fun triggerPingVibration(context: Context) {
+            try {
+                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    vm?.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 350, 200, 350, 200, 350), -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(longArrayOf(0, 350, 200, 350, 200, 350), -1)
+                }
+            } catch (_: Exception) {}
+        }
+
+        fun notifySafetyCheckPing(context: Context, pingId: String, contactName: String) {
+            try {
+                createNotificationChannel(context)
+                val intentOk = Intent(context, ProtectionForegroundService::class.java).apply {
+                    action = ACTION_RESPOND_PING_SAFE
+                    putExtra(EXTRA_PING_ID, pingId)
+                }
+                val pendingOk = PendingIntent.getService(
+                    context,
+                    pingId.hashCode(),
+                    intentOk,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+
+                val notification = NotificationCompat.Builder(context, SAFETY_PING_CHANNEL_ID)
+                    .setContentTitle("🚨 Safety Check: $contactName")
+                    .setContentText("Emergency contact checking on you. Tap to confirm you're safe.")
+                    .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                    .setAutoCancel(true)
+                    .addAction(android.R.drawable.checkbox_on_background, "I'M OK", pendingOk)
+                    .build()
+
+                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                nm.notify(SAFETY_PING_NOTIFICATION_ID, notification)
+            } catch (_: Exception) {}
+        }
+
+        fun createNotificationChannel(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val manager = context.getSystemService(NotificationManager::class.java) ?: return
+
+                val channel = NotificationChannel(
+                    PROTECTION_CHANNEL_ID,
+                    "ZeroTap Protection Service",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Shows persistent status while sensor protection is active"
+                }
+                manager.createNotificationChannel(channel)
+
+                val pingChannel = NotificationChannel(
+                    SAFETY_PING_CHANNEL_ID,
+                    "ZeroTap Emergency Safety Pings",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Urgent alerts when emergency contacts check on your safety"
+                    enableVibration(true)
+                }
+                manager.createNotificationChannel(pingChannel)
+            }
+        }
 
         fun acknowledgeActivePingSafe(pingId: String? = null) {
             val id = pingId ?: _activeSafetyPing.value?.pingId ?: return

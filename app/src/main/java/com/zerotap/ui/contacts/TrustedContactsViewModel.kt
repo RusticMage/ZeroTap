@@ -51,6 +51,7 @@ class TrustedContactsViewModel(application: Application) : AndroidViewModel(appl
     }
 
     init {
+        com.zerotap.service.EmergencyContactSyncManager.start(application)
         refreshPairingStatus()
     }
 

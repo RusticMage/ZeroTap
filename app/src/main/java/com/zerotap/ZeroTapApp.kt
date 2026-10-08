@@ -94,5 +94,6 @@ class ZeroTapApp : Application() {
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.initialize(this)
+        com.zerotap.service.EmergencyContactSyncManager.start(this)
     }
 }
